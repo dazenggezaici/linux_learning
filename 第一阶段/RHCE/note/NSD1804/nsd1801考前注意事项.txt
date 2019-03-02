@@ -1,0 +1,257 @@
+考试环境真机：RHEL7.3/7.4，带图形桌面，无管理权限
+考试环境虚拟机：RHEL7.0/7.2/7.4，不带图形桌面，有管理权限
+
+!!!! 所有的答题操作命令行如何实现？
+
+
+RHCSA部分 —— 
+
+答题顺序：
+1）看考试说明（提供地址、用户、软件资源、注意事项）
+2）整体浏览所有考试题（用户/权限、分区）
+3）过重设密码+配置网络两关
+4）先做高风险题（分区操作、装新内核）
+5）再答其他题目
+
+交卷处理：
+1）先把虚拟机关机
+2）再重新开启虚拟机
+3）检查所有答题结果
+4）告知考官交卷
+
+
+整体注意事项 ——
+1）防火墙的处理
+    考试时不要求，可以关闭或忽略
+2）SELinux的处理
+    考试时有可能会要求不能disabled，对重设密码有影响，对其他题目没影响
+3）yum软件源
+    由考官服务器提供，需要手动指定使用这个源（有对应考题）
+
+
+其他注意事项 ——
+1）重设root密码时
+进恢复模式时，改内核参数 rd.break  console=tty0
+touch  /.autorelabel 文件名不要写错为 /.autorelable
+2）从nmcli命令行配置网络时
+关于默认网关的配置，
+如果是RHEL7.0
+nmcli ..  ipv4.addresses  "IPv4地址/掩码位数  默认网关"
+如果是RHEL7.2及以上
+nmcli ..  ipv4.gateway  "默认网关"
+3）为虚拟机指定yum源
+必要时可以清空旧配置 
+# rm  -rf   /etc/yum.repos.d/*.repo
+别忘了禁用软件签名检查
+# vim  /etc/yum.conf
+gpgcheck=0
+4）逻辑卷扩容
+被扩展的逻辑卷vo考试是是现成的、已经格式化过的
+完成扩容后要记得刷新文件系统大小（resize2fs或xfs_growfs）
+千万不要再格式化
+5）配置cron计划任务
+执行时间点的各种写法，任务命令操作直接从题目复制
+6）内核升级
+建议先下载内核安装文件 kernel-版本号.rpm，确认结果
+安装时使用 rpm  -ivh  。。。rpm，千万别用 rpm  -Uvh
+安装过程需要耐心等待，千万不要Ctrl c中断，也不要关闭终端
+7）LDAP客户端
+使用authconfig-tui命令去配置，
+配置过程中提示下载证书时先不要按OK（另开终端连过去，把证书下载好以后再返回再OK）
+8）autofs配置
+按题目要求只需要实现自动挂载 ldapsuerX 一个用户
+如果配置适用于所有用户也可以
+如果LDAP用户的家目录是通过NFSv3共享的，挂载参数需要添加 v3
+# vim  /etc/策略文件
+ldapuser0	-rw,v3	服务器地址:目录路径		
+9）NTP网络时间客户端
+有可能chrony包已经装好，但是 /etc/chrony.conf文件中有错误
+可以先删除错误的配置文件
+# rm  -rf  /etc/chrony.conf
+再重装chrony包
+# yum  -y  reinstall  chrony
+10）分区规划操作
+先总览所有题目，确定需要分几个区、每个分区的大小
+再执行分区操作，fdisk分区过程中尽量不要用d
+分区保存后记得partprobe刷新，再重起虚拟机
+11）创建逻辑卷
+如果新建卷组时忘记指定PE大小
+可以删除这个卷组，再重新创建（添加 -s  PE大小）
+12）所有题目中要求的文件名/格式、文件路径要一致
+
+
+#################################################
+
+
+RHCE部分 ——
+答题顺序：
+1）看考试说明（提供地址、用户、软件资源、注意事项、用户密码、网段地址）
+2）整体浏览所有考试题
+3）两台虚拟机的root密码是预先告知的，不需要重设
+4）两台虚拟机的主机名需要手动配置正确
+5）两台虚拟机的IP地址参数是通过DHCP分配的，可以不用改
+6）先做高风险题（防火墙、Samba、安全NFS、iSCSI）
+7）再答其他题目
+
+交卷处理：
+1）先把虚拟机2、虚拟机1关机
+2）再重新开启虚拟机1，等60秒左右再开虚拟机2
+3）检查所有答题结果
+4）告知考官交卷
+
+整体注意事项 ——
+1）防火墙的处理
+    考试时需要开启（system1端口转发、system1/system2网段访问控制）
+2）SELinux的处理
+    考试时要求enforcing，会影响Samba、Web服务
+    解决SELinux对Samba的影响：
+    # setsebool  -P  samba_export_all_rw=on
+    解决SELinux对Web的影响：
+	网页目录尽量放到 /var/www/ 下的子目录
+	# semanage  port  -a  -t  http_port_t  -p tcp  8909
+3）yum软件源
+    由考官服务器提供，需要手动指定使用这个源（没有对应考题）
+
+
+其他注意事项：
+1）SSH访问控制
+如果防火墙能搞定此题，那么sshd服务可跳过
+2）别名设置
+需要在 /etc/bashrc 去设置，
+alias   别名='实际执行的命令行'
+3）防火墙部分
+配置工具：firewall-config或firewall-cmd
+在system1上：
+    默认安全区设为trusted，
+    将指定网段地址添加到block安全区
+    实现端口转发（5423 =》80），测试时不要从本机访问
+在system2上：
+    默认安全区设为trusted，
+    将指定网段地址添加到block安全区
+4）配置链路聚合
+网卡 eth1、eth2 考试时是现成的
+添加链路聚合的操作 可以 man  nmcli-examples ==> Team1
+链路聚合的runner配置 可以 man  teamd.conf ==> "runner
+尽量复制粘贴不要手写
+为聚合连接配置的IP地址千万不要与eth0在同一个网段
+5）配置IPv6地址
+记得为虚拟机设置静态主机名
+测试操作  ping6  IPv6地址，不要误写 ping6  IPv6地址/64
+6）零客户邮件服务器
+考试时 system1、system2都要配置为零客户邮件服务器
+关于 local_transport = error:报错信息  配置，
+考试时没要求的话不要写（只是模拟考试需要）
+7）配置及访问Samba共享
+建议在客户端使用smbclient测试Samba共享资源
+# smbclient  -L  服务器地址
+# smbclient  -U  用户名  //服务器地址/共享名
+ls 如果能看到结果 说明 有读取权限
+mkdir  mulu1 如果能成功 说明有写入权限
+
+客户端挂载参数：
+username=用户名,password=密码,multiuser,sec=ntlmssp,_netdev
+
+多用户访问测试，不能用root直接测：
+# su  -  普通用户
+$ cifscreds  add  -u  共享用户名  服务器地址
+Password:共享用户的密码
+$ 访问挂载点
+
+所有涉及到开机自动挂载的操作，
+建议先编写/etc/fstab文件，再执行 mount  -a来检查
+
+8）配置及访问NFS共享
+system1需要开启的系统服务：
+    nfs-server.service
+	nfs-secure-server.service
+system2需要开启的系统服务：
+	nfs-secure.service
+
+实现安全NFS的环境：
+考试时由考官预先布置好
+模拟考试时需要在两台虚拟机手动执行 lab  nfskrb5  setup
+
+!!! 所有的lab、rht-vmctl操作在正式考试时都不可用
+
+
+发布安全NFS共享：
+# vim  /etc/exports
+目录绝对路径		客户网段地址/掩码位数(rw,sec=krb5p)
+
+客户端挂载参数：
+_netdev ==》普通NFS
+sec=krb5p,_netdev ==》普通NFS
+
+有可能出现NFSv4版本要求——
+在system1服务端：
+# vim  /etc/sysconfig/nfs
+RPCNFSDARGS="-V  4" 			【注意是大写字母  -V】
+
+在system2客户端：
+挂载参数添加 v4 				【注意是小写字母 v】
+
+9）iSCSI网络磁盘
+客户端挂载参数：
+_netdev
+
+客户端重起会卡死的问题：
+# vim  /etc/bashrc
+.. ..
+alias  reboot='sync ; reboot -f'
+# source  /etc/bashrc
+
+客户机别忘了设置IQN名称——
+根据题目给的iSCSI磁盘名修改（最后一个部分）
+在配置文件 /etc/iscsi/initiatorname.iscsi 中指定，配完以后记得要重起 iscsid 服务
+这个IQN名称 必须 与 iSCSI服务端的 acls 授权设置一致
+
+客户端在对连接的iSCSI磁盘分区/格式化操作时，千万看仔细不要格式化错了
+
+10）关于客户机上 Samba/NFS/iSCSI 资源的挂载问题
+现象：客户机重起以后部分资源没有挂载成功，需要手动执行 mount  -a才能挂上
+原因：服务器准备这些资源需要一段时间，在客户机开机时还没准备完毕，导致挂载不成功
+解决办法：
+# chmod  +x  /etc/rc.d/rc.local
+# vim  /etc/rc.d/rc.local
+.. ..
+for  i  in  {1..30}
+do
+    mount  -a
+	sleep  5
+done
+11）Web服务器
+建议为每一个虚拟站点准备独立的配置文件，
+默认站点的配置文件名最好以00开台
+httpd  -t 检查语法
+
+动态网站这个，别忘了 Listen 8909
+测试访问动态网站时 http://域名:8909/  要写对
+12）Shell脚本
+脚本的文件名和路径不要写错
+foo.sh 不要写成foo
+batchusers 不要写成 batchusers.sh
+13）数据库
+数据库名、用户名不要写错（区分大小写）
+删除空密码的root用户时，千万要提前为root用户设好密码
+必要时重建数据库系统 ——
+# systemctl  stop  mariadb
+# rm  -rf  /var/lib/mysql/
+# yum  -y  reinstall  mariadb-server
+# systemctl  restart  mariadb 
+
+##############################################
+
+关于模拟考试：
+访问 http://localhost/exam/
+  EX200 ==》RHCSA部分
+  EX300 ==》RHCE部分
+
+RHCSA部分争取90分钟内做完、做对
+RHCE部分争取150分钟内做完、做对（>=90%）
+
+
+[root@room9pc13 ~]# rht-labcheck
+.. ..
+Lab-Check finished, 
+your pass-rate is 8.10%，except skiped item.
+

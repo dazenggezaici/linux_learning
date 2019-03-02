@@ -1,0 +1,98 @@
+安全web服务（https）
+
+一、构建安全的web服务
+1、部署网站证书（营业执照）
+存放目录：/etc/pki/tls/certs
+文件在classroom服务器里：http://classroom/pub/tls/certs/server0.crt
+2、部署根证书（工商局的位置信息）
+存放目录：/etc/pki/tls/certs
+文件获取地址：http://classroom/pub/example-ca.crt
+3、私钥
+存放目录：/etc/pki/tls/private
+文件获取地址：http://classroom/pub/tls/private/server0.key
+4、安装mod_ssl软件包-支持加密通信
+yum -y install mod_ssl
+5、修改配置文件
+配置文件路径：/etc/httpd/conf.d/ssl.conf
+vim编辑器：在末行模式（:）下输入set nu可以显示行标签
+把59行和60行的注释去掉
+	DocumentRoot "/var/www/html"  # 指定网站存放路径
+	ServerName www0.example.com:443  # 指定网站域名
+把100行的网站证书路径修改成自己存放网站证书的路径
+	SSLCertificateFile /etc/pki/tls/certs/server0.crt
+把107行的网站私钥路径修改成自己存放网站私钥的路径
+	SSLCertificateKeyFile /etc/pki/tls/private/server0.key
+把122行的注释去掉并把根证书路径该为自己存放ca证书的路径
+	SSLCACertificateFile /etc/pki/tls/certs/example-ca.crt
+6、重启服务
+服务名：httpd
+访问https://www0.example.com
+
+二、基础邮件服务
+1、协议
+用户发出的邮件协议SMTP 端口25
+用户接收的邮件协议POP3 端口25
+2、构建邮件服务
+安装软件包yum -y install postfix （默认已安装）
+3、修改配置文件
+配置文件路径：/etc/postfix/main.cf
+修改第98行，去除注释，将myorigin值修改为server0.example.com
+	myorigin = server0.example.com  # 默认补全域名后缀
+将116行的inet_interfaces的值改为all（默认为localhost）
+	inet_interfaces = all  # 本机所有网卡都提供邮件服务
+将164行的mydestination的值改为server0.example.com
+	mydestination = server0.example.com  # 此字段值，判断为本域邮件
+4、重启服务
+服务名：postfix
+systemctl restart postfix
+5、测试收发邮件
+创建用户zhangsan、lisi
+使用mail命令：
+	mail -s '邮件标题' -r 发件人 收件人  # 交互式发邮件
+	echo '邮件正文' | mail -s '邮件标题' -r 发件人 收件人  # 非交互式发邮件
+	mail -u 用户  # 查看邮件
+
+三、规划分区（parted）
+对象主要是对GPT分区类型进行分区。--fdisk是针对MBR类型
+GPT：
+	最多有128个主分区
+命令：
+	parted /dev/vdb  # 进入编辑/dev/vdb硬盘交互界面
+	(parted)mktable gpt  # 指定分区为GPT类型
+	(parted)mkpart  # 进行分区
+	(parted)print  # 打印分区情况
+	(parted)unit GB(gb)  # 将打印出数据单位改为GB
+	
+四、交换空间（虚拟内存）
+命令：
+	swapon -s  # 查看交换空间
+	swapon /dev/vdb1  # 启用/dev/vdb1交换空间
+	mkswap /dev/vdb1  # 将vdb1格式化成交换分区格式
+	swapoff /dev/vdb1  # 停用/dev/vdb1交换空间
+开机自动启用交换空间：
+	配置文件路径：/etc/fstab
+	配置信息：/dev/vdb1 swap swap defaults 0 0
+	swapon -a  # 自动检测/etc/fstab文件下的挂载信息并全部挂载，类似mount -a。
+
+五、配置聚合连接（链路聚合）
+热备份（activebackup）
+命令（参考man teamd.conf）：
+1、创建虚拟网卡team0：
+	nmcli connection add type team con-name team0 ifname team0
+	 autoconnect yes config '{"runner":{"name":"activebackup"}}'
+		解释：	con-name 创建配置文件的名字/etc/sysconfig/network-scripts
+		  /ifcfg-team0
+			ifname 虚拟网卡的名称
+			config 配置为热备份或者负载均衡
+2、添加成员
+	nmcli connection add type team-slave con-name team0-1 ifname eth1
+	 master team0
+		解释：	ifname 这里后面是写需要加入的成员的网卡名称
+			master 指的是跟随或者说为哪个虚拟网卡工作
+3、配置并激活虚拟网卡IP
+	nmcli connection modify team0 ipv4.method manual ipv4.addresses 192.168.1.1/24 connection.autoconnect yes
+	nmcli connection up team0
+
+
+
+

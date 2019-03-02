@@ -1,0 +1,169 @@
+									RHCE WEB配置思路
+
+一、实现一个Web服务器
+
+1. 为 http://server0.example.com 配置Web服务器：
+1)从 http://classroom/pub/materials/station.html 下载一个主页文件,将其重命名为 index.html
+2)将此文件拷贝到站点的 DocumentRoot 目录下
+3)不要对文件 index.html 的内容作任何修改
+
+在server0上
+# yum  -y  install  httpd 							//安装 WEB服务
+# yum  -y  install  elinks							//安装elinks软件，方便在字符终端中访问查看WEB内容（elinks -dump http://172.25.0.11-显示：Default Site.）
+# wget  http://classroom/pub/materials/station.html -O  /var/www/html/index.html    //下载并将文件放到其他目录下
+# systemctl  restart  httpd						//重启WEB服务
+# systemctl  enable  httpd/						//开机自动启动WEB服务
+
+
+二、配置安全Web服务
+
+为站点 http://server0.example.com 配置TLS加密：
+一个已签名证书从 http://classroom.example.com/pub/tls/certs/server0.crt 获取
+此证书的密钥从 http://classroom.example.com/pub/tls/private/server0.key 获取
+此证书的签名授权信息从 http://classroom.example.com/pub/example-ca.crt 获取 
+
+在server0上
+# cd   /etc/pki/tls/certs/							//切入至签名目录
+# wget  http://classroom/pub/tls/certs/server0.crt	//下载签名证书
+# wget  http://classroom/pub/example-ca.crt			//下载签名授权信息
+# ls 
+
+# cd  /etc/pki/tls/private/						//切入至密钥目录
+# wget http://classroom/pub/tls/private/server0.key	//下载密钥
+# ls 
+
+—— 安装模块包，调整配置文件
+# yum  -y  install  mod_ssl						//安装加密程序
+# vim  /etc/httpd/conf.d/ssl.conf  					//修改mod_ssl主配置文件
+第59/60/100/107/122行
+DocumentRoot "/var/www/html"
+ServerName server0.example.com:443
+SSLCertificateFile /etc/pki/tls/certs/server0.crt
+SSLCertificateKeyFile /etc/pki/tls/private/server0.key
+SSLCACertificateFile /etc/pki/tls/certs/example-ca.crt
+—— 重起服务，浏览器访问验证
+# systemctl  restart  httpd						//重启服务
+# firefox https://server0.example.com				//必须用firefox登入且开头是 https不是http
+
+三、配置虚拟主机
+
+在 server0 上扩展您的 web 服务器，为站点 http://www0.example.com 创建一个虚拟主机，然后执行下述步骤：
+设置 DocumentRoot 为/var/www/virtual
+从 http://classroom.example.com/pub/materials/www.html 下载文件并重命名为index.html
+不要对文件 index.html 的内容进行任何修改
+将文件 index.html 放到虚拟主机的 DocumentRoot 目录下
+确保 fleyd 用户能够在/var/www/virtual 目录下创建文件
+注意：原始站点 http://server0.example.com 必须仍然能够访问，名称服务器 example.com 提供对主机名 www0.example.com 的域名解析。 
+
+在server0上
+
+【语法检查：httpd  -t】
+rpm -ql httpd | grep vhost 
+/usr/share/doc/httpd-2.4.6/httpd-vhosts.conf 			//帮助文档可以复制<VirtualHost>字头
+
+# mkdir  /var/www/virtual							//创建virtual文件夹
+# wget http://classroom/pub/materials/www.html -O /var/www/virtual/index.html    //下载文件并放到virtual下
+# vim  /etc/httpd/conf.d/nsd01.conf					//创建并修改WEB virtual主配置文件（重要）
+
+<VirtualHost *:80>            						//所有IP地址的80端口
+    ServerName  www0.example.com  					//指定站点名
+    DocumentRoot /var/www/virtual 					//指定站点网页目录
+</VirtualHost>  	  
+
+# systemctl restart httpd							//重启WEB服务
+# elinks  -dump  http://www0.example.com/			//查看以下网页
+
+#######确保 fleyd 用户（网站管理员）能在 /var/www/virtual 目录建文件##############################
+
+# useradd fleyd									//创建用户
+# ls -ld /var/www/html/							//查看为目录权限
+# setfacl -m u:fleyd:rwx /var/www/html/ 				//设置目录ACL权限
+# getfacl /var/www/html/							//查看目录ACL设置信息
+# su - fleyd										//进入用户
+# touch /var/www/html/1.txt						//测试一下，创建一个文件
+# exit											//创建成功后即可退出
+
+#######确保站点 http://server0.example.com 仍然可用############################################
+
+# vim  /etc/httpd/conf.d/nsd01.conf					//修改WEB主配置文件
+<VirtualHost *:80>
+    ServerName  server0.example.com   				//指定站点名
+    DocumentRoot /var/www/html    					//指定站点网页目录
+</VirtualHost>
+
+# systemctl  restart  httpd						//重启WEB服务
+# elinks  -dump  http://server0.example.com/			//查看第一个Virtual网站
+# elinks  -dump  http://www0.example.com/			//查看第二个Virtual网站
+
+四、配置Web内容访问
+
+在您的 server0 web服务器的 DocumentRoot 目录下创建一个名为 private 的目录，要求如下：
+从 http://classroom.example.com/pub/materials/private.html 下载一个文件副本到这个目录，并且命名为 index.html
+不要对这个文件的内容做任何修改
+从 server0 上，任何人都可以浏览 private 的内容，但是从其他系统不能访问这个目录的内容
+
+# mkdir /var/www/html/private   	 				//创建网页目录
+# wget http://classroom/pub/materials/private.html  -O /var/www/html/private/index.html   //部署网页
+# vim  /etc/httpd/conf.d/nsd02.conf  				//配置WEB主配置文件
+
+<Directory /var/www/html/private>					//控制表头为 <Directory>
+  Require  ip  172.25.0.11   127.0.0.1   ::1           //仅允许哪些客户机(Require)
+</Directory>
+
+# systemctl  restart  httpd						//重启WEB服务
+测试（只能从server0上可访问，从desktop0不能访问）
+# elinks  -dump  http://server0.example.com/private/	//测试输出网页注意这里需要以目录/private
+httpd  -t 										//检查配置是否正确
+
+五、实现动态Web内容
+
+在 server0 上配置提供动态Web内容，要求如下：
+动态内容由名为 webapp0.example.com 的虚拟主机提供
+虚拟主机侦听在端口 8909
+从 http://classroom.example.com/pub/materials/webinfo.wsgi 下载一个脚本，然后放在适当的位置，无论如何不要修改此文件的内容
+客户端访问 http://webapp0.example.com:8909 可接收到动态生成的 Web 页
+此 http://webapp0.example.com:8909/必须能被 example.com 域内的所有系统访问
+
+在server0上
+#rpm -ql mod_wsgi | grep RE						//搜索安装列表，查找别名的帮助文档便于复制
+# mkdir  /var/www/webapp0							//创建webapp0文件夹
+# cd    /var/www/webapp0							//切入到此文件夹下
+# wget http://classroom/pub/materials/webinfo.wsgi	//下载Python编写的网页信息
+# ls /var/www/webapp0								//确认是否下载下来
+—— 装模块文件，为新虚拟站点建立配置
+# yum  -y  install  mod_wsgi						//安装mod_wsgi程序
+# vim  /etc/httpd/conf.d/nsd01.conf					//修改主配置文件
+
+Listen 8909										//监听8909端口
+<VirtualHost *:8909>								//字头要把80改为8909	
+       ServerName  webapp0.example.com				//更改站点名称
+       DocumentRoot  /var/www/webapp0				//更改网页根目录
+	WSGIScriptAlias  /  /var/www/webapp0/webinfo.wsgi	//添加一个别名
+</VirtualHost>
+
+# semanage port -l | grep http_port					//查看SELinux以开启端口
+# semanage port -a -t http_port_t -p tcp 8909			//开启SELinux8909端口
+# systemctl restart  httpd							//重启WEB服务
+—— 浏览器访问测试
+# elinks  -dump  http://webapp0.example.com:8909/		//测试访问，注意这里要加端口号：8909
+
+提示：
+WSGIScriptAlias  别名   实际网页路径
+
+常见问题：开启8909端口服务启动失败
+解决颁发：关闭SELinux，或者按警告信息调整SELinux端口保护策略
+
+查看SELinux的警告信息：
+vim /var/log/messages 		/8909
+
+you need to modify the port type.
+# semanage port -a -t PORT_TYPE -p tcp 8909
+    其中 PORT_TYPE 是以下之一：http_cache_port_t, http_port_t, jboss_manage
+
+semanage port -a -t http_port_t -p tcp 8909
+
+
+
+
+
+

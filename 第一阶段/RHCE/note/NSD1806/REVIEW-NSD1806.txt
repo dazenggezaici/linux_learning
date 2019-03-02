@@ -1,0 +1,520 @@
+﻿
+
+李佳宇
+
+考试介绍、考场介绍、注意事项
+考点串讲（RHCSA）
+   陌生知识点 讲+练
+   熟悉知识点 解题示范
+考点串讲（RHCE）
+   陌生知识点 讲+练
+   熟悉知识点 解题示范
+
+09:30~12:00 
+14:00~16:30
+16:30~18:00  自由练习
+
+资料获取： 
+	QQ群（RHCE考前辅导）：303486093 【群文件 .. ..】
+	http://172.40.50.113/rhce/
+	http://172.40.50.113/rhce/rhcsa.pdf（样题）
+	http://172.40.50.113/rhce/rhce.pdf （样题）
+	http://localhost/exam/ （模拟考试题）
+
+
+考试流程：
+携带身份证、笔
+红帽考官提前布置考场环境，通知考生入场
+听考官宣读考试纪律（禁止作弊、禁止交头接耳/东张西望、……）
+听考官指示填写相关资料（身份证号、电子邮箱、姓名拼音、证书号）
+单击“开始考试”后，倒计时开启
+
+考试真机桌面 有访问考试系统图标
+真机（RHEL7.3 有图形，无root权限）
+虚拟机（RHEL7.0 没有图形界面，有root权限）
+
+从真机 ssh  -X  root@虚拟机IP地址
+
+考场需要提供你的英文姓名、身份证号、电子邮箱、已有的证书编号
+上下午填写的信息要一致。
+成绩邮件在考试之后5个工作日之内（当天晚上）
+
+	具体考试要求以实际题目为准
+
+关于证书查询：
+	默认不对外提供，
+	如果希望查询到，需要到红帽官网注册一个账号，关联你的证书并设置允许被查询。
+
+﻿
+讲师机桌面（北京）：
+	vncviewer  172.40.50.121:7000
+
+RHCSA 核心考点列表
+####################################################
+
+一、开考准备 —— 
+1. 重设虚拟机的root密码【##】
+关键点：如何进入恢复模式（正常的系统根默认挂载到/sysroot）
+1)重启虚拟机 server,出现 GRUB 启动菜单时按 e 键进入编辑状态
+2)找到 linux16 所在行,末尾添加 rd.break console=tty0,按 Ctrl+x 键进恢复模式
+3)以可写方式挂载硬盘中的根目录,并重设 root 密码:
+
+switch_root:/# 
+switch_root:/# mount -o remount,rw /sysroot
+switch_root:/# chroot /sysroot/
+sh-4.2# echo  密码  |  passwd  --stdin  root
+
+sh-4.2# touch  /.autorelabel
+或者
+sh-4.2# vim  /etc/selinux/config
+SELINUX=disabled
+
+sh-4.2# exit
+sh-4.2# reboot
+第一次重起过程会有点慢
+
+
+switch_root:/#  ===》恢复模式（一套临时的Linux环境，真正的根目录只是恢复模式的一个目录 /sysroot）
+switch_root:/# vim  /sysroot/etc/fstab
+相当于
+switch_root:/# chroot  /sysroot
+sh-4.2# vim  /etc/fstab
+
+
+2. 为虚拟机配置网络 
+网卡名（内核识别的设备名）：eth0
+连接名（管理员指定的配置名）：eth0  （System eth0）
+
+
+系统服务：NetworkManager
+
+nmcli
+Network Manager Command Line Interface
+
+
+如果原来已经有现成的连接：
+1）修改连接配置
+# nmcli  con  mod  "连接名"  ipv4.method  manual  ipv4.addresses  "IPv4地址/掩码位数  默认网关地址"  ipv4.dns  DNS服务器地址  connection.autoconnect  yes
+2）激活新配置
+# nmcli  con  up  "连接名"
+
+关于RHEL7.2以上系统，默认网关配置：
+# nmcli  con  mod  .. ..  ipv4.gateway  默认网关地址
+
+如果原来没有任何现成的连接：
+1）先添加连接
+# nmcli  con  add  con-name  连接名   ifname  网卡名  type  ethernet
+2）再修改连接配置
+3）激活新配置
+
+
+
+二、系统管理任务 ——
+1. 添加YUM源
+3. 添加用户/组账号
+11. 配置用户账号
+4. 设置文件权限
+6. 建共用目录（SGID）
+
+mkdir  -m  权限模式  目录名
+
+5. 配置计划任务
+
+分  时  日  月  周  命令行
+
+每3天做一次/backup.sh操作？
+0  0  */3  *  * 	 /backup.sh
+
+0  0  13  *  5 	 /abc.sh 任务会在什么时间执行？
+或者
+
+
+7. 升级内核
+提供的资源：
+kernel-3.....rpm [v]  ==》右击，复制链接地址
+kernel-doc-3.....rpm
+
+方式1：
+# rpm  -ivh  内核文件的下载地址
+
+方式2：
+# wget  内核文件的下载地址
+# rpm  -ivh  kernel-3.....rpm
+
+检查结果：
+# ls  /boot/vmlinuz*
+# uname  -r
+
+
+
+三、文档管理 ——
+13. 查找文件（find）
+
+以下提示忽略即可：
+find: ‘/proc/2035/task/2035/fdinfo/6’: 没有那个文件或目录
+find: ‘/proc/2035/fdinfo/6’: 没有那个文件或目录
+
+14. 检索文本（grep）
+
+16. 创建归档（tar）
+
+
+四、配置应用客户端 ——
+10. 设置NTP时间同步客户端
+软件包：chrony
+配置文件：/etc/chrony.conf
+server  NTP服务器的地址
+服务：chronyd
+
+可能遇到一个小坑：
+可能chrony包已经安装，而且提供的配置文件是错误的
+解决办法：
+# rm  -rf  /etc/chrony.conf
+# yum  -y  reinstall  chrony
+# vim  /etc/chrony.conf
+.. ..
+
+8. 设置LDAP客户端 【##】
+装包：sssd
+配置工具：authconfig-gtk/authconfig-tui
+系统服务：sssd
+
+熟悉英文界面：
+# LANG=   authconfig-tui
+
+问题：配置界面卡死、虚拟机死机
+原因：内存不够
+解决：把虚拟机强制关机、重新开
+
+
+如何解决LDAP用户家目录的问题？
+方式1：手动mount挂载NFS共享提供的目录
+
+方式2：通过autofs自动挂载/卸载NFS共享提供的目录
+1）当需要用XX用户的家目录时，自动创建挂载点（只能建一层目录）并挂载对应的共享
+2）当不需要用XX用户的家目录时，自动挂载对应的共享并删除挂载点
+
+
+9. 设置autofs触发挂载+NFS共享客户端 【##】
+配置关键：
+1）让autofs帮管理员监控哪一个目录（用户家目录的父目录）
+2）当需要访问一个子目录时，怎么操作（哪个目录对应哪个设备）？
+
+# mkdir  -p  用户家目录的父目录
+
+# vim  /etc/auto.master
+被监控的目录路径 		自定义操作策略文件的路径
+
+# vim  操作策略文件的路径
+挂载点名 	-挂载参数		服务器地址:NFS共享目录的路径
+
+五、磁盘分区及存储 ——
+15. 添加逻辑卷
+
+# mkfs.xfs  逻辑卷路径
+# mkfs.ext3 逻辑卷路径
+# mkfs.ext4 逻辑卷路径
+# mkfs.vfat  -F  32  逻辑卷路径
+
+
+2. 扩展逻辑卷
+   逻辑卷vo在考试时是预先提供好的
+
+识别文件系统的类型：
+# blkid  文件系统
+
+刷新文件系统大小：
+# resize2fs  文件系统
+
+# xfs_growfs  文件系统
+
+
+
+12. 添加交换分区
+
+关于交换分区的优先级：
+pri=优先级
+
+
+
+考试环境的磁盘情况：
+虚拟机只有一块磁盘 /dev/vda （包括 /boot 、卷组、剩余空间）
+
+练习环境的磁盘情况：
+虚拟机有磁盘 /dev/vda（包括 /boot等，没有剩余空间） 
+虚拟机有磁盘 /dev/vdb（空磁盘，全部空闲）
+
+提前处理/dev/vdb，模拟成考试时的vda
+
+
+分区之前，需要确定2个问题 ——
+1）需要增加几个新分区？
+2）这几个分区分别需要多大，预计给哪一道题目使用
+     500M 扩容、1000M 新逻辑卷、512M 交换分区
+
+
+####################################################
+
+﻿
+
+RHCE 核心考点列表
+####################################################
+
+一、安全策略配置 ——
+1. 配置SELinux
+
+允许发布Samba共享目录：
+# setsebool  -P  samba_export_all_rw=on
+
+允许Web服务开启非标准端口：
+# semanage  port  -a  -t http_port_t  -p  tcp  8909
+
+!!! 通过 sealert 获取提示
+you need to modify the port type.
+# semanage port -a -t PORT_TYPE -p tcp 8909
+    其中 PORT_TYPE 是以下之一：http_cache_port_t, http_port_t, jboss_management_port_t, j
+
+
+!!!! 练习环境的 setsebool -P 、semanage  -a 可能失败或死机
+原因：内存不够
+解决办法：
+1）把虚拟机强制关机，重新开机，重新做这些操作
+2）为虚拟机添加交换分区
+
+
+2. 配置SSH访问（+防火墙）【##】
+# vim  /etc/ssh/sshd_config
+DenyUsers  用户名1@客户机地址   用户名2@客户机地址  
+#AllowUsers  用户名1@客户机地址   用户名2@客户机地址  
+
+3. 自定义用户环境（别名设置）
+4.  配置防火墙端口转发
+顺便把其他所有题目关于防火墙的需求都解决了
+
+在system1上：
+1）修改默认安全区，允许任何访问
+2）拒绝指定的某个网段访问
+3）实现端口转发（5423 =》80）
+# firewall-cmd  --permanent  --zone=trusted
+--add-forward-port=被转发端口设置:协议设置:目标端口设置
+# firewall-cmd  --permanent  --zone=trusted
+--add-forward-port=port=被转发端口:proto=tcp:toport=目标端口
+# firewall-cmd  --permanent  --zone=trusted
+--add-forward-port=port=5423:proto=tcp:toport=80
+
+在system2上：
+1）修改默认安全区，允许任何访问
+2）拒绝指定的某个网段访问
+
+配置工具 —— 
+图形的 firewall-config
+命令行 firewall-cmd
+
+测试端口转发时，需要从其他机器访问
+http://server0.example.com:5423
+http://server0.example.com
+
+
+
+二、网络连接配置 ——
+5. 配置链路聚合
+如何创建聚合连接（运行模式），
+
+# man  nmcli-examples  ==》 /Team1 获得命令操作帮助
+
+# man  teamd.conf ==》/"runner 获得运行模式配置
+
+
+6. 配置IPv6地址
+
+# nmcli  con  mod  "连接名"  ipv6.method  manual  ipv6.addresses  "IPv6地址/掩码位数"  
+
+测试工具：
+# ping6  IPv6地址
+
+
+
+三、配置邮件服务器 ——
+7. 配置本地邮件服务 【##】
+标准邮件服务器（qq邮箱）：
+    1）提供电子邮箱（yangguo@qq.com）及存储空间
+    2）为客户端向外发送邮件给其他邮箱（xiaolongnv@163.com）
+    3）接收/投递其他邮箱用户发给本邮箱用户的邮件
+零客户邮件服务器（机房内网）： —— nullclient 只发不收
+    1）不提供电子邮箱
+    2）为客户端向外发送邮件给其他邮箱（xiaolongnv@163.com）
+    3）不接收/投递其他邮箱用户发给本服务器的邮件
+
+    属性配置：有一台后端标准邮件服务器、发件来源
+
+    例如：旅游景点（海南三亚）代寄礼品（10个椰子）的代办点
+
+考试环境：
+1）把 system1、system2 配置为一台零客户邮件服务器
+2）由考官提供后端的标准邮件服务器
+
+
+!!!! 关键点：两台虚拟机都需要正确配置静态的主机名
+
+练习环境：
+1）把 server0 配置成零客户邮件服务器
+# vim  /etc/postfix/main.cf
+relayhost = [后端邮件服务器地址]
+inet_interfaces = loopback-only
+myorigin = 发件来源地址
+mynetworks = 127.0.0.0/8  [::1]/128
+mydestination = 哪些邮箱区域/后缀需要安排投递邮件
+local_transport = error:报错信息
+
+2）使用 desktop0 来模拟后端的标准邮件服务器
+# lab  smtp-nullclient  setup
+
+测试目标 —— 在server0上发一封邮件给本机的student用户，结果会在deskop0上的student用户看到这封邮件
+
+
+
+四、配置文件服务器/客户端 —— 
+8. 通过Samba发布共享目录
+软件包：samba
+配置：/etc/samba/smb.conf
+系统服务：smb
+
+
+9. 配置多用户Samba挂载
+软件包：samba-client、cifs-utils
+配置：/etc/fstab
+
+
+
+配置关键：把哪个目录给哪个机器用（是否需要密码）
+
+10. 配置NFS共享服务 【##】
+11. 挂载NFS共享 【##】
+
+简单NFS共享服务端的配置 ——
+软件包：nfs-utils
+配置文件：/etc/exports
+文件夹的绝对路径    客户机地址(ro)
+系统服务：nfs-server
+
+简单NFS共享客户端的使用 ——
+# vim  /etc/fstab
+服务器地址:NFS共享目录的绝对路径  挂载点  nfs _netdev  0  0
+# mount  -a
+
+
+提前准备LDAP+kerberos认证环境：
+LDAP服务器提供用户名（比如 ldapuser0、krishna）
+kerberos服务器提供密码验证（比如密码 kerberos）
+
+kerberos认证的好处（通行证）：一次验证，多次免密码登录
+
+在两台虚拟机上执行以下操作（正式考试不需要）：
+# lab  nfskrb5  setup
+
+安全NFS共享服务端的配置 ——
+软件包：nfs-utils
+1）配置文件：/etc/exports
+文件夹的绝对路径    客户机地址(rw,sec=krb5p)
+2）为服务器本机部署kerberos加密密钥到 /etc/krb5.keytab
+3）系统服务：nfs-server、nfs-secure-server
+
+安全NFS共享客户端的使用 ——
+1）为客户机本机部署kerberos加密密钥到 /etc/krb5.keytab
+2）# vim  /etc/fstab
+服务器地址:NFS共享目录的绝对路径  挂载点  nfs sec=krb5p,_netdev  0  0
+3）系统服务：nfs-secure
+4）挂载安全NFS共享
+# mount  -a
+
+验证方法：
+# ssh  ldapuser0@desktop0
+$ touch  /mnt/nfssecure/project/a.txt
+
+
+常见的一些问题：
+1）No route to host ==》对方的防火墙拒绝
+2）RPC: Program not registered ==》对方的NFS服务没开
+3）mount  -a时 incorrect option ==》客户端nfssecure没开
+4）mount  -a时没响应 ==》NFS服务端联系不上（重起）
+5）mount  -a时提示 access  denied ==》权限不够
+	a. 服务端的 exports 授权的地址有误
+	b. 服务端或客户端密钥有问题（文件名或内容有错误）
+	c. 密钥文件过期（classroom太久没重置）
+	d. 忘记执行lab。。。操作
+
+检查密钥文件是否符合：
+# klist  -k  /etc/krb5.keytab
+# less  /var/log/messages
+
+
+19. 配置iSCSI服务端 【##】
+用途：通过网络提供网络磁盘（target === 磁盘柜（包含多块逻辑磁盘））
+软件包：targetcli
+配置工具：targetcli
+系统服务：target
+
+提供的target的IQN名称？（题目提供）
+
+
+
+20. 配置iSCSI客户端 【##】
+用途：通过网络访问网络磁盘（发现、连接）
+软件包：iscsi-initiator-utils
+配置工具：iscsiadm
+系统服务：iscsi、iscsid（修改IQN名之后起一次）
+
+客户机的IQN名称？（自己拟定，可以参考iSCSI磁盘名做一些改变）
+
+
+
+iSCSI客户端在RHEL7.0环境下有个小bug，
+导致的问题 reboot 时会死机
+解决办法：
+改用 sync;reboot  -f 代替 reboot
+# vim  /etc/bashrc
+alias  reboot='sync;reboot  -f'
+# sync;reboot
+
+
+五、配置网站服务器 ——
+12.实现一个web服务器
+13.配置安全web服务
+14.配置虚拟主机
+15.配置web内容的访问
+16.实现动态WEB内容
+
+获取配置帮助：
+# yum  -y  install  httpd-manual
+# systemctl  restart  httpd
+# 浏览器访问  http://server0.example.com/manual
+
+# rpm  -ql  mod_wsgi
+.. ..  README
+# vim  .. .. README ==》查找 WSGIS 
+
+
+六、Shell脚本编程 —— 
+17. 创建一个脚本
+18. 创建一个添加用户的脚本
+
+
+七、配置及管理数据库 ——
+21. 配置一个数据库
+22. 数据库查询（填空）
+
+有可能3个表、货物
+
+fisrt name、last name
+
+忘记数据库的root密码，重建数据库的操作：
+# rm  -rf  /var/lib/mysql
+# yum  -y  reinstall  mariadb-server
+# systemctl  restart  mariadb
+
+###################################################
+
+模拟考试要求：
+	上午 90分钟内完成，正确率 >= 90%
+	下午 150分钟内完成，正确率 >= 90%
+

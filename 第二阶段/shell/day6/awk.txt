@@ -1,0 +1,108 @@
+awk:
+	格式：
+		前置命令 | awk 选项 '[条件]{指令}'
+		awk 选项 '[条件]{指令}' 文档
+	[条件]指令：  # 指令要用{}括起来
+		print:
+			awk '/he/{print $2}' txt  # 输出包含he的行的第二个单词
+				以空格为间隔的单词，print $1,$2,输出第一个和第二个单词
+			内置变量：
+				$0:行的全部单词
+				$1,$2,$3..$n:行的第一第二第三第N个单词
+				NR:行号  # 可以在条件中用NR==3来显示第三行
+				NF:列号，就是该行有几个单词
+			输出常量：
+				awk '/^root/{print "当前行",NR,$0}' /etc/passwd
+					当前行 1 root:x:0:0:root:/root:/bin/bash
+					#显示以root开头的行，打印字符串"当前行" 行号 当前行的所有(列)内容
+				例：  # 查看当前主机接收流量是多少
+					ifconfig eth0 | awk -F[\(\)] '/RX p/{print "当前主机接收流量为",$2}'
+		行前指令，行后指令：
+			awk 'BEGIN{指令}[条件]{指令}END{指令}' txt
+				# BEGIN是执行前做的事，END后是必须在前面指令全部循环处理完所有行才执行
+			例：  # 统计有几个用户是用bash解释器
+				awk 'BEGIN{x=0}/bash$/{x++}END{print x}' /etc/passwd
+		~:  # 波浪号，叠加条件
+			awk -F: '$1~/root/' /etc/passwd  # 这里print可以省略
+				# 显示/etc/passwd中必须包含root，且root是第一个单词(第一列)的行
+			awk -F: '$7!~/nologin/' /etc/passwd
+				# 显示/etc/passwd中第七列不包含nologin的行
+			
+	选项
+		-F:
+			修改分隔符，默认为空格
+			如：修改分隔符为冒号
+				awk -F: '/^root/{print $6}' /etc/passwd
+				#以冒号为分隔符，输出/etc/passwd文件中以root开头的行的第六个单词
+				awk -F[:/] xxxxx  # 冒号或/都可为分隔符，注：如果本文中同时
+						出现:/那么在:和/之间也算一个单词，只不过为空
+	
+	逻辑测试条件：
+		显示3-5行内容：awk 'NR>=3&&NR<=5' txt
+		显示第三列大于1000的行：awk '$3>1000' txt
+		# 与数学逻辑思维类似，不存在大于1000且小于10的数，逻辑错误不报错
+	数学运算：
+		awk 'BEGIN{x=0;x++;print x}'  输出 1
+		seq 200 | awk '$1%3==0'  # 显示200以内能被3整除的数
+		seq 200 | awk '$1%7==0&&/7/'  # 显示200以内能被7整除且包含7的数
+	流程控制：
+		awk '{if(条件){前面条件中了就执行这个大括号里的内容}else(){}}END{print 结果}'
+	awk数组:
+		格式：数组名[下标]=值
+		awk 'BEGIN{a[0]=0;a[1]=11;a[2]=22;for(i in a){print i,a[i]}}'
+			#定义一个数组a并给a[0],a[1],a[2]赋值，for循环中的变量i是数组的下标，从0开始
+
+
+
+
+
+例1：  # 打印类似表User UID Home于/etc/passwd文件中
+awk -F: 'BEGIN{print "############USER-UID-HOME#########\nUser\tUID\tHome"}/bash$/{print $1"\t"$3"\t"$6}END{print "\nTotal",NR,"lines.\n###############END###############"}' /etc/passwd
+输出结果：
+############USER-UID-HOME#########
+User		UID		Home
+root		0		/root
+student	1000	/home/student
+todd		1001	/home/todd
+zengge		1002	/home/zengge
+dazengge	1003	/home/dazengge
+
+Total 42 lines.
+###############END###############
+
+例2：  # 从/etc/passwd中筛选出用bash解释器的用户，在/etc/shadow找到密码id
+#!/bin/bash
+user=`awk -F: '/bash$/{print $1}' /etc/passwd`
+for i in $user
+do
+	grep "^$i:" /etc/shadow | awk -F: '{print $1,"==>",$2}'
+	#  由于awk中的条件''里不支持用户自定变量，所以先用grep筛选出对应的行
+done
+
+例3：  #统计ip出现的次数
+cat ip_table
+	192.168.4.1
+	192.168.4.1
+	192.168.4.2
+	192.168.4.3
+	192.168.4.3
+	192.168.4.3
+awk '{ip[$1]++}END{for(i in ip){print i,"次数:",ip[i]}}' ip_table
+	192.168.4.1 次数: 2
+	192.168.4.2 次数: 1
+	192.168.4.3 次数: 3
+	
+	# 统计访问本机http服务的IP的次数，访问记录在/var/log/httpd/access_log
+	awk '{ip[$1]++}END{for(i in ip){print "主机:"i,"\t访问网页次数:",ip[i]}}' /var/log/httpd/access_log
+	输出结果：
+		主机:172.25.0.250 	访问网页次数: 13
+
+
+
+
+
+
+
+
+
+

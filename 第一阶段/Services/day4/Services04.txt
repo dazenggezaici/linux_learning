@@ -1,0 +1,274 @@
+检测新的教学环境
+
+    虚拟机A:服务端 
+       1)主机名:svr7.tedu.cn
+    2)eth0IP地址:192.168.4.7/24
+    3)Yum仓库:yum clean all ----> yum repolist   
+    虚拟机B:客户端
+       1)主机名:pc207.tedu.cn
+    2)eth0IP地址:192.168.4.207/24
+    3)Yum仓库:yum clean all ----> yum repolist 
+
+######################################################
+部署DHCP服务器
+
+DHCP概述及原理
+• Dynamic Host Configuration Protocol
+– 动态主机配置协议,由 IETF(Internet 网络工程师任
+务小组)组织制定,用来简化主机地址分配管理
+
+• 主要分配以下入网参数
+– IP地址/子网掩码/广播地址
+– 默认网关地址、DNS服务器地址
+
+• DHCP地址分配的四次会话（广播进行，先到先得）
+– DISCOVERY --> OFFER --> REQUEST -->ACK
+– 一个网络中只能有一台DHCP服务器
+
+虚拟机A：构建DHCP服务器
+1.安装软件包
+[root@svr7 /]# yum -y install dhcp
+2.修改配置文件
+[root@svr7 /]# vim /etc/dhcp/dhcpd.conf
+ :r  /usr/share/doc/dhcp*/dhcpd.conf.example
+
+ subnet 192.168.4.0 netmask 255.255.255.0 {  #分配的网段
+  range 192.168.4.100 192.168.4.200;   #分配的IP地址范围
+  option domain-name-servers 8.8.8.8;  #分配的DNS服务器
+  option routers 192.168.4.254;        #分配的网关地址
+  default-lease-time 600;              #IP地址的租期时间
+  max-lease-time 7200;
+  }
+
+[root@svr7 /]# systemctl restart dhcpd
+
+####################################################
+
+网络装机的优势
+• 规模化:同时装配多台主机
+• 自动化:装系统、配置各种服务
+• 远程实现:不需要光盘、U盘等物理安装介质
+
+什么是PXE网络
+• PXE,Pre-boot eXecution Environment
+– 预启动执行环境,在操作系统之前运行
+– 可用于远程安装
+
+• 工作模式
+– PXE client 集成在网卡的启动芯片中
+– 当计算机引导时,从网卡芯片中把PXE client调入内存
+执行,获取PXE server配置、显示菜单,根据用户选
+择将远程引导程序下载到本机运行
+
+#####################################################
+构建网络装机服务器
+一  修改DHCP服务器配置，指定网络装机服务器配置
+[root@svr7 /]# vim /etc/dhcp/dhcpd.conf 
+  ......
+  next-server 192.168.4.7;     #指定下一个服务器IP地址
+  filename  "pxelinux.0";      #指定网卡引导文件名字
+ } 
+
+[root@svr7 /]# systemctl restart dhcpd
+
+  pxelinux.0：网卡引导文件  （安装说明书） 二进制文件
+                       安装软件可以自动生成该文件，默认叫pxelinux.0
+
+二 搭建tftp服务，提供众多引导文件
+
+    tftp：简单的文件传输协议  默认端口为 69
+       默认共享路径：/var/lib/tftpboot
+
+1.安装软件包
+[root@svr7 /]# yum -y install tftp-server
+2.重起服务
+[root@svr7 /]# systemctl restart tftp
+[root@svr7 /]# systemctl enable tftp
+3.部署pxelinux.0引导文件
+]# yum  provides   */pxelinux.0   #查询仓库中那个软件产生此文件
+]# yum -y install syslinux        
+]# rpm -ql syslinux | grep pxelinux.0   #查询软件包安装清单
+
+]# cp /usr/share/syslinux/pxelinux.0      /var/lib/tftpboot/
+
+]# ls /var/lib/tftpboot/    #tftp默认共享路径
+
+
+4.读取菜单文件/var/lib/tftpboot/pxelinux.cfg/default
+
+]# mkdir /var/lib/tftpboot/pxelinux.cfg
+]# ls /var/lib/tftpboot/
+]# mount /dev/cdrom /mnt
+
+]# ls /mnt/
+
+]# cp /mnt/isolinux/isolinux.cfg /var/lib/tftpboot/pxelinux.cfg/default
+
+]# ls -l /var/lib/tftpboot/pxelinux.cfg/
+]# chmod u+w /var/lib/tftpboot/pxelinux.cfg/default
+]# ls -l /var/lib/tftpboot/pxelinux.cfg/
+
+5.部署 图形的模块 与 背景图片
+ vesamenu.c32(图形的模块：显示颜色，识别背景图片)
+ splash.png(背景图片)
+
+]# cp /mnt/isolinux/vesamenu.c32  /mnt/isolinux/splash.png  /var/lib/tftpboot/
+
+]# ls /var/lib/tftpboot/
+
+6.部署 启动内核 与 驱动程序
+     vmlinuz(启动内核)
+     initrd.img(驱动程序)
+]# cp /mnt/isolinux/vmlinuz /mnt/isolinux/initrd.img /var/lib/tftpboot/
+
+]# ls /var/lib/tftpboot/
+initrd.img  pxelinux.cfg  vesamenu.c32
+pxelinux.0  splash.png    vmlinuz
+
+7.修改菜单文件内容
+[root@svr7 ~]# vim /var/lib/tftpboot/pxelinux.cfg/default 
+  1 default vesamenu.c32  #默认加载图形模块
+  2 timeout 600           #默认读秒实现为60秒   1/10秒
+
+ 10 menu background splash.png   #加载背景图片splash.png 
+ 11 menu title NSD1812 PXE Server !  #菜单标题
+
+ 61 label linux
+ 62   menu label Install RHEL7.4    #选项显示
+      menu  default                 #默认选项
+ 63   kernel vmlinuz                #加载内核
+ 64   append initrd=initrd.img      #加载驱动程序
+
+#######################################################
+总结：
+    DHCP-----》IP地址、next-server、filename
+    tftp-----》pxelinux.0
+    pxelinux.0-----》读取菜单文件  default
+    default-----》vesamenu.c32 、splash.png ....... 
+
+###################################################
+简单测试：
+    新建一台全新的虚拟机
+      1.选择  “网络引导安装（PXE）” 
+      2.选择网络类型为“private1”
+###################################################
+三、部署无人值守安装                       
+
+1.搭建Web服务器，共享光盘所有内容
+[root@svr7 ~]# yum -y install httpd
+[root@svr7 ~]# mkdir /var/www/html/rhel7
+[root@svr7 ~]# ls /var/www/html/rhel7
+[root@svr7 ~]# mount /dev/cdrom  /var/www/html/rhel7
+
+[root@svr7 ~]# ls /var/www/html/rhel7
+	
+[root@svr7 ~]# systemctl restart httpd
+[root@svr7 ~]# systemctl enable httpd
+
+[root@svr7 ~]# firefox 192.168.4.7/rhel7
+
+2.安装一个图形的工具，生成应答文件
+[root@svr7 ~]# yum -y install system-config-kickstart 
+
+3.运行system-config-kickstart 进行生成应答文件
+
+[root@svr7 /]# system-config-kickstart
+    首先查看  "软件包选择"   是否可以使用
+   
+    需要Yum仓库支持,必须要求  光盘的仓库标识为  [development]
+  [root@svr7 ~]# vim /etc/yum.repos.d/rhel7.repo 
+    [development]
+        .........
+
+[root@svr7 /]# system-config-kickstart 
+     查看  "软件包选择"   是否可以使用
+
+4.保存应答文件
+[root@svr7 ~]# ls /root/ks.cfg 
+/root/ks.cfg
+
+5.共享应答文件
+[root@svr7 ~]# cp /root/ks.cfg  /var/www/html/
+[root@svr7 ~]# ls /var/www/html/
+ks.cfg  rhel7
+[root@svr7 ~]# firefox 192.168.4.7/ks.cfg
+
+6.通过菜单文件，指定应答文件的位置
+[root@svr7 ~]# vim /var/lib/tftpboot/pxelinux.cfg/default 
+.........
+label linux
+ menu label Install RHEL7.4
+ menu default
+ kernel vmlinuz
+ append initrd=initrd.img ks=http://192.168.4.7/ks.cfg
+
+######################################################
+总结：
+    DHCP-----》IP地址、next-server、filename
+    tftp-----》pxelinux.0
+    pxelinux.0-----》读取菜单文件  default
+    default-----》vesamenu.c32 、splash.png  ks.cfg ....... 
+    ks.cfg-----》root密码   分区   时区 .......
+                 url --url="http://192.168.4.7/rhel7"
+#######################################################
+
+     17:30上课
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

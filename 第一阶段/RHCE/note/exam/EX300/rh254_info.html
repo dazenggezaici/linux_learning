@@ -1,0 +1,37 @@
+﻿<html>
+<title>RHCE7-EX300模拟测试</title>
+<body>
+<p></p>
+<p></p>
+<p>
+<center>
+<h1>考试说明</h1></br>
+</center>
+</p>
+您在考试过程中将使用的两个系统的信息如下：<br>
+&nbsp;* server<font color="red">0</font>.example.com(ServerX) 是一个主要的服务器<br>
+&nbsp;* desktop<font color="red">0</font>.example.com(DesktopX)主要用作客户端<br>
+两个系统的root密码为redhat<br>
+系统的IP地址由DHCP提供，您可以视其正常，或者您可以按以下信息重新设置为静态IP：<br>
+&nbsp;* server<font color="red">0</font>.example.com ：172.25.<font color="red">0</font>.11<br>
+&nbsp;* desktop<font color="red">0</font>.example.com ：172.25.<font color="red">0</font>.10<br>
+子网掩码为：255.255.255.0<br>
+您的系统是DNS域 .example.com 的成员，所有在DNS域 .example.com 中的系统都在子网172.25.<font color="red">0</font>.0/24中，同样在这个子网中的系统都在DNS域 .example.com 中。除非特别指明，所有要求配置的网络都必须能被 .example.com 域中的系统访问。<br>
+classroom.example.com 提供了集中认证的服务域 .example.com，两个系统 server<font color="red">0</font> 和 desktop<font color="red">0</font> 已经预先配置成此域的客户端，此域提供了下列用户帐号（模拟环境酌情创建）：<br>
+&nbsp;* ldapuser<font color="red">0</font> （密码：kerberos)<br>
+&nbsp;* fleyd （密码：redhat)<br>
+&nbsp;* sergio （密码：redhat)<br>
+&nbsp;* krishna （密码：redhat)<br>
+
+防火墙默认是打开的，在您认为是适当的时候可以关闭。其他的关于防火墙的设置可能在单独的要求中。<br>
+在评分之前您的系统会被重新启动，所以请您确保您所做的所有修改和服务配置在重新启动之后仍然能够生效，而无需人工干预。所有考试用的虚拟机实例必须能重启之后进入正确的用户级别，而无需人工协助。如果考试用的虚拟机不能启动或不能正常启动，将被评零分。<br>
+您在考试中使用的Red Hat Enterprise Linux操作系统版本对应的分发包可以通过YUM在下面的链接中找到：http://content.example.com/rhel7.0/x86_64/dvd<br>
+一部分要求包含了主机安全、确定您的对主机安全限制没有阻挡要求允许的主机或网络。虽然您正确配置了网络服务但本来允许访问的主机或网络被阻挡。这样也不会得分。<br>
+您将会注意到一些要求明确不允许服务被域 my133t.org 访问，这个域的系统在 172.34.0.0/255.255.255.0 子网中，并且这些子网中的系统都属于域 my133t.org 。<br>
+注意一些考试题目可能依赖于其他考试题目。比如说，在考试题目中可能要求您针对一个用户执行一系列的限制，但是这个用户的创建可能是在其他题目中要求的。<br>
+为了方便您的标识，每个考试题目都有一些选取按钮以协助您去标识哪个题目您已经完成了，哪些还没有。当然，如果您觉得用不着，您也可以不去理会这些按钮。<br><br>
+</br></br>
+<center>
+<input type="button" name="Submit" onclick="javascript:history.back(-1);" value="返回前一页"></center>
+</body>
+</html>

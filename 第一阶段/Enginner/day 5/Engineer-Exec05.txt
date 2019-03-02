@@ -1,0 +1,95 @@
+案例练习,准备:
+            rht-vmctl  reset  classroom
+            rht-vmctl  reset  server
+	        rht-vmctl  reset  desktop
+######################################################
+案例1:为虚拟机 server 配置以下永久的静态地址参数
+– 主机名:server0.example.com
+– IP地址:172.25.0.113
+– 子网掩码:255.255.255.0
+– 默认网关:172.25.0.254
+– DNS服务器:172.25.254.254
+
+
+案例2:在在 server0、desktop0 上操作
+– 将防火墙默认区域设置为trusted
+
+案例3:指定yum软件源
+为 server0 指定可用的 yum 软件源
+– YUM软件库的地址为 http://classroom.example.com/content/rhel7.0/x86_64/dvd
+– 将此配置为虚拟机 server0 的默认软件仓库
+– 确认可用的仓库列表
+– 利用yum仓库安装system-config-kickstart
+
+
+
+案例4:tar制作/释放归档压缩包（zcf、ztf、zxf、jcf、jtf、jxf、cf、tf）
+  首先创建/root/boothome/与/root/usrsbin/目录
+    1）备份/boot、/home这两个文件夹，保存为boothome.tar.gz文件
+    2）查看boothome.tar.gz文件内包含哪些内容 
+    3）将boothome.tar.gz释放到文件夹/root/boothome/下
+    4）备份/usr/sbin目录，保存为usrsbin.tar.bz2文件
+    5）查看usrsbin.tar.bz2文件内包含哪些内容
+    6）将usrsbin.tar.bz2释放到/root/usrsbin/文件夹下
+
+
+案例5:在server上操作，搭建mariadb数据库系统
+1. 在 server0 上安装 MariaDB 数据库系统
+1)安装 mariadb-server软件包
+2)启动 mariadb 服务
+
+
+案例6:在server上操作，配置一个数据库
+– 为mariadb数据库root设置登陆密码为 haxi
+– 新建一个数据库名为 nsd
+– 除了 root 用户,此数据库只能被用户 lisi 查询,此用户的密码为 123(用户的授权)
+– 数据库 nsd 中应该包含来自数据库复制的内容,(数据库导入数据)
+数据库文件的 URL为:http://classroom/pub/materials/users.sql
+– GRANT 权限列表  ON  数据库名.表名  TO 
+    用户名@客户机地址  IDENTIFIED  BY '密码';
+
+
+案例7:在server上操作，使用数据库查询
+
+1)查询base表所有内容
+2)查询location表所有内容
+3)查询base表的结构	desc base;
+4)查询location表的结构
+5)查询base表内容,只显示name字段
+6)查询mysql库中的user表内容,只显示user,host,password字段
+7)密码是 solicitous 的人的名字?
+8)有多少人的姓名是 Barbara 同时居住在 Sunnyvale?
+9)在base表中追加记录  id为6，name为Barbara，password为900
+10)在location表中追加记录  id为6，city为Sunnyvale
+11)再次查询有多少人的姓名是 Barbara 同时居住在 Sunnyvale?
+
+
+
+
+案例8:虚拟机 server0操作， /dev/vdb 上按以下要求建立分区：
+
+采用默认的 msdos 分区模式 
+– 第1个分区 /dev/vdb1 的大小为 3G
+– 第2个分区 /dev/vdb2 的大小为 200M
+– 第3个分区 /dev/vdb3 的大小为 100M
+– 第4个分区 /dev/vdb4为扩展分区
+– 在划分三个分区逻辑分区/dev/vdb[5-6]，
+– 分区大小依次为500M、2000M
+
+
+案例9：发布iSCSI网络磁盘
+
+ 1）配置 server0 提供 iSCSI 服务，要求如下：
+ 2）磁盘名为iqn.2016-02.com.example:server0
+ 3）服务端口为 3260
+ 4）使用 iscsi_store（后端存储的名称） 作其后端卷，其大小为 3GiB
+ 5）此磁盘服务只能被 desktop0.example.com 访问，在Server0上配置客户端ACL为iqn.2016-02.com.example:desktop0
+ 6）配置虚拟机desktop0 使用 虚拟机server0 提供 iSCSI 服务
+
+
+
+
+
+
+
+

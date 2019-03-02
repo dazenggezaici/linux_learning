@@ -1,0 +1,55 @@
+字符串：
+	子串（substr）截取方法：
+		${变量名:起始位置:长度}
+		a=abcdefg
+		echo ${a:4:3}
+			efg
+	子串（substr）替换：
+		${变量名/old/new}  # 只替换第一个匹配的
+		${变量名//old/new}  # 替换所有匹配的
+	字符串掐头：
+		${变量名#*关键字}  # "#"用来删除头部，*通配，最短匹配删除
+			MDIR=“/var/spool/mail/root”
+			echo ${MDIR#*/}
+				var/spool/mail/root
+		${变量名##*关键字}  # "#"用来删除头部，*通配，最长匹配删除
+			echo ${MDIR##*/}
+					root
+		
+		去尾就是把#改成%,然后顺序是从右往左匹配
+			MDIR=“/var/spool/mail/root”
+			echo ${MDIR%/*}  # 从右往左匹配，第一个/和第一个/后的所有(*)删除
+				/var/spool/mail
+定义变量初值：  # 初值：当变量未定义或为空时则使用初值，否则使用定义好的变量值。
+	${变量名:-初值}  # 注意冒号后面有个横杠
+
+expect:  # 能把交互式的该成非交互式的，需要通过yum安装
+	格式：
+	expect << EOF
+		命令
+	EOF
+	例：
+	expect << EOF
+		spawn ssh 192.168.4.5  # 固定格式，后面接有交互式界面的命令
+		expect "password:" { send "123456\r" }  # \r是回车
+		expect echo "success"  # 最后一条不会执行，所以每次都需要写多一条
+	EOF
+	
+正则表达式：
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	

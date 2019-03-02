@@ -1,0 +1,417 @@
+搭建新的教学环境
+
+一  建立两台虚拟机
+真机:快速新建虚拟机命令(脚本)
+[root@room9pc01 ~]# clone-vm7
+Enter VM number: 5
+Creating Virtual Machine disk image......	[OK]
+Defining new virtual machine......		[OK]
+[root@room9pc01 ~]# 
+[root@room9pc01 ~]# clone-vm7
+Enter VM number: 6
+Creating Virtual Machine disk image......	[OK]
+Defining new virtual machine......		[OK]
+[root@room9pc01 ~]# 
+
+二  配置两台虚拟机  利用root用户  密码为 123456
+
+虚拟机A
+   配置永久的主机名:svr7.tedu.cn
+   配置eth0网卡IP地址:192.168.4.7/24
+[root@svr7 /]# nmcli connection modify eth0        ipv4.method manual ipv4.addresses 192.168.4.7/24     connection.autoconnect  yes
+[root@svr7 /]# nmcli connection up eth0
+  
+虚拟机B
+   配置永久的主机名:pc207.tedu.cn
+   配置eth0网卡IP地址:192.168.4.207/24
+
+
+三 真机远程管理虚拟机
+1.真机可以与虚拟机通信
+2.真机进行远程管理,修改虚拟机密码
+
+[root@svr7 ~]# echo 1 | passwd --stdin root
+更改用户 root 的密码 。
+passwd：所有的身份验证令牌已经成功更新。
+[root@svr7 ~]# 
+
+
+[root@pc207 ~]#  echo 1 | passwd --stdin root
+更改用户 root 的密码 。
+passwd：所有的身份验证令牌已经成功更新。
+[root@pc207 ~]# 
+
+3.为真机设置别名  
+    alias goa='ssh  -X  root@192.168.4.7'
+    alias gob='ssh  -X  root@192.168.4.207'
+
+四  构建Yum仓库
+
+1.真机构建FTP服务,共享光盘所有内容
+[root@room9pc01 ~]# rpm -q vsftpd
+vsftpd-3.0.2-22.el7.x86_64
+[root@room9pc01 ~]# systemctl status vsftpd  #查看服务状态
+
+  FTP默认共享的路径:/var/ftp
+验证:
+[root@room9pc01 ~]# ls /var/ftp/rhel7/
+ /etc/fstab不支持快捷方式,所有的路径都必须时确切的路径
+
+[root@room9pc01 ~]# ls /
+[root@room9pc01 ~]# ls -l /iso
+
+[root@room9pc01 ~]# ls /var/lib/libvirt/images/iso/
+
+[root@room9pc01 ~]# vim /etc/fstab 
+/var/lib/libvirt/images/iso/rhel-server-7.4-x86_64-dvd.iso  /var/ftp/rhel7  iso9660  defaults  0  0
+
+[root@room9pc01 ~]# firefox ftp://192.168.4.254/rhel7/
+
+2.客户端:虚拟机A与虚拟机B
+[root@svr7 ~]# cat /etc/yum.repos.d/rhel7.repo
+[rhel7]
+name=rhel7.4
+baseurl=ftp://192.168.4.254/rhel7
+enabled=1
+gpgcheck=0
+[root@svr7 ~]# 
+
+[root@pc207 ~]# cat /etc/yum.repos.d/rhel7.repo
+[rhel7]
+name=rhel7.4
+baseurl=ftp://192.168.4.254/rhel7
+enabled=1
+gpgcheck=0
+[root@pc207 ~]# 
+
+###################################################
+系统&服务管理进阶 Day01
+
+扩展的几个应用
+目录结构
+• 认识Linux的目录层次:
+– man hier
+
+• 常见一级目录的用途
+	/boot        存放系统引导必需的文件,包括内核、启动配置
+	/bin、/sbin  存放各种命令程序
+	/dev         存放硬盘、键盘、鼠标、光驱等各种设备文件
+	/etc         存放Linux系统及各种程序的配置文件
+	/root、/home/用户名 分别是管理员root、普通用户的默认家目录
+	/var          存放日志文件、邮箱目录等经常变化的文件
+	/proc         存放内存中的映射数据,不占用磁盘
+	/tmp          存放系统运行过程中使用的一些临时文件
+
+权限的数值表示
+• 权限的数值化
+– 基本权限:r = 4,w = 2,x = 1
+– 附加权限:SUID = 4,SGID = 2,Sticky Bit = 1
+
+• 采用数值形式设置权限
+– chmod [-R] nnn 文档...
+– chmod [-R] xnnn 文档...
+
+[root@svr7 ~]# mkdir /nsd01
+[root@svr7 ~]# ls -ld /nsd01
+
+[root@svr7 ~]# chmod 700 /nsd01
+[root@svr7 ~]# ls -ld /nsd01
+
+[root@svr7 ~]# chmod 007 /nsd01
+[root@svr7 ~]# ls -ld /nsd01
+
+[root@svr7 ~]# chmod 750 /nsd01
+[root@svr7 ~]# ls -ld /nsd01
+
+[root@svr7 ~]# chmod 3755 /nsd01
+[root@svr7 ~]# ls -ld /nsd01
+drwxr-sr-t. 2 root root 6 1月  16 14:13 /nsd01
+
+####################################################
+
+历史命令
+• 管理/调用曾经执行过的命令
+– history:查看历史命令列表
+– history -c:清空历史命令
+– !n:执行命令历史中的第n条命令
+– !str:执行最近一次以str开头的历史命令
+
+• 调整历史命令的数量
+[root@svr7 ~]# vim /etc/profile
+HISTSIZE=1000   //默认记录1000条
+
+
+[root@svr7 ~]# history       #查看历史命令
+[root@svr7 ~]# history -c    #清空历史命令
+[root@svr7 ~]# ls
+
+[root@svr7 ~]# cat /etc/redhat-release 
+[root@svr7 ~]# ls /opt/
+[root@svr7 ~]# history     #查看历史命令
+
+[root@svr7 ~]# !cat      #执行最近一条以cat开头的历史命令
+[root@svr7 ~]# !ls
+
+#####################################################
+• du,统计文件的占用空间
+– du [选项]... [目录或文件]...
+– -s:只统计每个参数所占用的总空间大小
+– -h:提供易读容量单位(K、M等)
+
+[root@svr7 ~]# du  -sh  /etc/  /root  /boot
+[root@svr7 ~]# du  -sh  /var
+
+[root@svr7 ~]# du  -sh  /
+
+####################################################
+• date,查看/调整系统日期时间             
+– date +%F、date +%R
+– date +"%Y-%m-%d %H:%M:%S"
+– date -s "yyyy-mm-dd HH:MM:SS"
+
+[root@svr7 ~]# date
+
+[root@svr7 ~]# date +%F   #显示年月日
+[root@svr7 ~]# date +%R   #显示时与分
+[root@svr7 ~]# date +%Y   #显示年
+[root@svr7 ~]# date +%m   #显示月
+[root@svr7 ~]# date +%d   #显示日期
+#################################################
+制作快捷方式:
+方式一:制作软连接
+[root@svr7 ~]# cat /etc/redhat-release 
+Red Hat Enterprise Linux Server release 7.4 (Maipo)
+[root@svr7 ~]# ln -s /etc/redhat-release /mnt/
+[root@svr7 ~]# ls /mnt/
+redhat-release
+[root@svr7 ~]# ln -s /etc/redhat-release /mnt/abc
+[root@svr7 ~]# ls /mnt/
+abc  redhat-release
+[root@svr7 ~]# ls -l /mnt/abc 
+lrwxrwxrwx. 1 root root 19 1月  16 15:06 /mnt/abc -> /etc/redhat-release
+[root@svr7 ~]# cat /mnt/abc 
+
+    软连接 若原始文件或目录被删除,连接文件将失效
+    软连接 可存放在不同分区/文件系统(跨分区)
+    软连接 可以是目录
+
+
+制作硬连接(硬链接)
+[root@svr7 ~]# echo 123  >  /opt/A
+[root@svr7 ~]# cat /opt/A
+[root@svr7 ~]# ln /opt/A   /opt/B      #制作硬链接
+[root@svr7 ~]# ls /opt/
+[root@svr7 ~]# cat /opt/B
+[root@svr7 ~]# ln -s /opt/A  /opt/C    #制作软连接
+[root@svr7 ~]# ls /opt/
+
+[root@svr7 ~]# cat /opt/C
+[root@svr7 ~]# ls /opt/
+[root@svr7 ~]# rm -rf /opt/A
+[root@svr7 ~]# ls /opt/
+[root@svr7 ~]# cat /opt/C     #原始文件删除,软连接不可以使用
+cat: /opt/C: 没有那个文件或目录
+[root@svr7 ~]# cat /opt/B     #原始文件删除,硬链接仍然可以使用
+123
+[root@svr7 ~]# 
+
+  硬连接 若原始文件被删除,连接文件仍可用
+  硬连接与原始文件必须在同一分区/文件系统
+
+#######################################################
+获取命令帮助
+
+方式1:   命令  --help
+
+方式2:   man  命令
+
+[root@svr7 ~]# man 5 passwd    #5配置文件的帮助信息
+
+####################################################
+zip归档工具(跨平台的压缩工具)
+
+• 归档+压缩操作
+– zip [-r] 备份文件.zip   被归档的文档...
+[root@svr7 ~]# zip -r /root/b.zip   /boot/  
+[root@svr7 ~]# ls /root/
+
+• 释放归档+解压操作
+– unzip 备份文件.zip [-d 释放目标文件夹]
+[root@svr7 ~]# mkdir /mnt/test
+[root@svr7 ~]# unzip /root/b.zip  -d  /mnt/test
+[root@svr7 ~]# ls /mnt/test
+
+[root@svr7 ~]# zip -r /root/h.zip   /home
+[root@svr7 ~]# ls /root/
+[root@svr7 ~]# unzip /root/h.zip  -d  /mnt/test
+[root@svr7 ~]# ls /mnt/test
+
+###################################################
+自定义Yum仓库
+                                                
+1.具备互联网下载的软件包
+2.将tools.tar.gz传输到虚拟机A的/root目录下
+ scp命令:依赖于ssh
+真机上传递:
+]# scp  /root/桌面/tools.tar.gz    root@192.168.4.7:/root/
+
+3.进行解包
+[root@svr7 ~]# tar -xf /root/tools.tar.gz  -C  /
+[root@svr7 ~]# ls /
+bin   etc   lib64  nsd01  root  srv  tools
+boot  home  media  opt    run   sys  usr
+dev   lib   mnt    proc   sbin  tmp  var
+[root@svr7 ~]# ls /tools/
+inotify-tools-3.13.tar.gz  other
+[root@svr7 ~]# ls /tools/other/
+
+4.创建仓库数据文件
+[root@svr7 ~]# ls /tools/other/
+[root@svr7 ~]# createrepo /tools/other/
+[root@svr7 ~]# ls /tools/other/
+[root@svr7 ~]# ls /tools/other/repodata
+5.修改Yum客户端配置文件
+[root@svr7 ~]# vim /etc/yum.repos.d/rhel7.repo 
+[rhel7]
+name=rhel7.4
+baseurl=ftp://192.168.4.254/rhel7
+enabled=1
+gpgcheck=0
+[other]
+name=my rpm
+baseurl=file:///tools/other    #指定本地为Yum仓库服务端
+enabled=1
+gpgcheck=0
+
+[root@svr7 ~]# yum repolist 
+
+####################################################
+vim编辑技巧
+[root@svr7 ~]# cp  /etc/passwd  /opt/1.txt
+[root@svr7 ~]# vim  /opt/1.txt
+光标跳转
+	上、下、左、右
+	Home 键 或 ^、数字 0 	跳转到行首
+	End 键 或“$”键 			跳转到行尾
+	1G 或 gg 				跳转到文件的首行
+	G 					跳转到文件的末尾行
+复制/粘贴/删除
+	yy、#yy 		      复制光标处的一行、#行
+ 	p、P 		      粘贴到光标处之后、之前
+	x 或Delete键 	          删除光标处的单个字符
+	dd、#dd 		      删除光标处的一行、#行
+	d^ 			      从光标处之前删除至行首
+	d$ 			      从光标处删除到行尾
+	u 			      撤销
+查找/撤销/保存
+	/word 		向后查找字符串“word”
+	n、N 		跳至后/前一个结果
+	u 			撤销最近的一次操作
+	U 			撤销对当前行的所有修改
+	Ctrl + r 	取消前一次撤销操作
+	ZZ(大写) 		保存修改并退出
+
+#######################################################
+利用yum安装 oneko 软件
+运行oneko命令
+
+######################################################
+末行模式操作
+
+保存/退出/文件操作
+	:w 					保存当前文件
+	:q! 					放弃已有更改后强制退出
+	:wq 或 :x 			保存已有修改后退出
+	:w /root/newfile 		另存为其它文件
+	:r /etc/filesystems 	读入其他文件内容
+
+[root@svr7 ~]# echo 123 > /opt/a.txt
+[root@svr7 ~]# echo abc > /opt/b.txt
+[root@svr7 ~]# vim /opt/a.txt 
+           :r  /opt/b.txt   #将/opt/b.txt内容读入到当前文件中
+           :r  /etc/passwd  #将/etc/passwd内容读入到当前文件中
+
+字符串替换
+	:s/root/abc 		     替换光标所在当前行第一个“root”
+	:s/root/abc/g 		替换光标所在当前行所有的“root”
+	:1,10 s/root/abc/g 	替换第1-10行所有的“root”
+	:% s/root/abc/g 	     替换文件内所有的“root”
+
+开关参数的控制
+	:set nu 或 nonu 		显示/不显示行号
+	:set ai 或 noai 		启用/关闭自动缩进
+
+#####################################################
+利用真机clone-vm7产生产两台虚拟机，利用root密码123456
+
+ 1.搭建虚拟机C服务端
+    要求：配置永久主机名svr10.tedu.cn
+	     配置eth0永久 IP地址：192.168.4.10/24
+             使用真机ftp服务器作为Yum源
+
+ 2.搭建虚拟机D客户端
+    要求：配置永久主机名pc20.tedu.cn
+	     配置eth0永久 IP地址：192.168.4.20/24
+             使用真机ftp服务器作为Yum源
+
+#####################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                     
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

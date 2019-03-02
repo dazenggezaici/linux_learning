@@ -1,0 +1,91 @@
+路由功能   将数据从一个网络传递到另一个网络
+路由设备依靠路由表传递数据
+直连路由，静态路由，默认路由，动态路由
+ip routing 
+
+传输层
+定义端口号  65535个  0号保留 1～1023 是知名服务端口号
+为了实现端到端的传输
+传输层使用两个协议：
+tcp 传输控制协议，数据在传输过程中比较安全可靠，但是效率较低，面向连接的
+
+syn 准备与对方建立连接
+ack 确认信息
+fin 与对方断开连接
+
+syn---ack,syn---ack
+fin---ack---fin---ack
+
+udp 用户数据报协议，无连接，数据传递不可靠，但效率高
+
+
+
+acl
+
+permit  允许
+deny    拒绝
+反掩码
+0 匹配
+1 不匹配
+
+使用标准acl限制pc2
+Router(config)#access-list 1 deny 192.168.2.1 0.0.0.0 
+或
+Router(config)#access-list 1 deny host 192.168.2.1
+以上两条配置其中一条即可，效果相同。
+
+Router(config)#access-list 1 permit any  //放行其他数据
+
+在接口中应用acl
+Router(config)#interface gigabitEthernet 0/1
+Router(config-if)#ip access-group 1 in
+
+实验二：
+Router(config)#access-list 1 permit host 192.168.2.1   //允许192.168.2.1通过
+
+
+使用扩展ACL过滤数据
+Router(config)#access-list 100 deny tcp host 192.168.2.1 host 192.168.1.1 eq 21   //禁止2.1访问1.1的ftp服务
+Router(config)#access-list 100 deny tcp host 192.168.2.2 host 192.168.1.1 eq 80   //禁止2.2访问1.1的web服务
+Router(config)#access-list 100 permit ip any any  //放行其他业务
+
+Router(config)#interface gigabitEthernet 0/1
+Router(config-if)#ip access-group 100 in   //在接口中应用acl
+
+ipv4 32位   42亿
+ipv6 128位     
+
+192.168.0.1  100.0.0.1             200.0.0.1  192.168.0.1
+
+100M     500～800    动态公网ip    故障率
+50M     40000        固定公网ip
+
+静态   一般用于服务器发布服务到公网，一台服务器使用一个公网ip
+静态端口映射   只发布某个服务到公网时使用
+
+PAT  一般用于仅访问外网时使用，比如员工办公室
+
+配置静态nat转换
+Router(config)#ip nat inside source static 192.168.1.1 100.0.0.2   //将1.1转换为100.0.0.2
+Router(config)#interface g0/1
+Router(config-if)#ip nat outside   //外网区域设置外边
+Router(config)#interface g0/0
+Router(config-if)#ip nat inside    //内网区域设置里边
+
+使192.168.1.2也能发布服务到外网，新购买公网地址100.0.0.3
+Router(config)#ip nat inside source static 192.168.1.2 100.0.0.3  
+
+静态端口映射
+Router(config)#ip nat inside source static tcp 192.168.1.1 80 100.0.0.2 80   //只发布80端口的服务到公网
+
+PAT
+Router(config)#access-list 1 permit 192.168.1.0 0.0.0.255   //限定可以访问外网的主机范围是192.168.1.0网段
+
+Router(config)#ip nat inside source list 1 interface g0/1 overload    //使用pat复用外网接口地址，使192.168.1.0网段所有主机可以访问外网（外网设备无法访问内网设备）
+
+
+
+
+
+
+

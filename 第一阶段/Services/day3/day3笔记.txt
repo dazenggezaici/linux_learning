@@ -1,0 +1,174 @@
+系统&服务管理进阶
+
+Split分离解析（DNS进阶）
+--为不同的客户机提供不同的解析结果（IP地址）
+--举例：网通用户就解析成网通的服务器IP地址，电信用户就解析成电信的服务器IP地址。
+--总结：针对不同的客户端提供最近的资源服务器。
+================================
+--分离解析要合理（每一个客户端都要找到自己的分类），由上到下，依次匹配，匹配及停止。
+--重点注意：所有的zone都需要在view里面
+--配置文件：/etc/named.conf
+view "a" {
+        match-clients { 192.168.4.207;192.168.7.0/24; };
+        zone "tedu.cn" IN  {
+                type master;
+                file "tedu.cn.zone";
+        };
+};
+
+view "other" {
+        match-clients { any; };
+        zone "tedu.cn" IN  {
+                type master;
+                file "tedu.cn.other";
+        };
+};
+
+--在/var/named/目录下需要tedu.cn.zone和tedu.cn.other文件，文件内容举例如下：
+/var/named/tedu.cn.other:
+$TTL 1D
+@	IN SOA	@ rname.invalid. (
+					0	; serial
+					1D	; refresh
+					1H	; retry
+					1W	; expire
+					3H )	; minimum
+tedu.cn.		NS	svr7
+svr7			A	192.168.4.7
+www			A	1.2.3.4
+
+----多区域分离解析：每一个view中，zone的个数要一致，zone对应的负责的域名要求一致
+
+view "a" {
+        match-clients { 192.168.4.207;192.168.7.0/24; };
+        zone "tedu.cn" IN  {
+                type master;
+                file "tedu.cn.zone";
+        };
+        zone "qq.com" IN {
+                type master;
+                file "qq.com.zone";
+        };
+};
+
+view "other" {
+        match-clients { any; };
+        zone "tedu.cn" IN  {
+                type master;
+                file "tedu.cn.other";
+        };
+        zone "qq.com" IN {
+                type master;
+                file "qq.com.other";
+        };
+};
+
+补充：
+ACL地址列表/etc/named.conf
+acl test {};  # 类似与在/etc/named.conf定义了一个列表
+acl test { 192.168.1.0/24; 192.168.2.0/24; 192.168.3.0/24; };
+
+view "other" {
+        match-clients { test; };  # 在这里调用，填入test;即可。
+        zone "tedu.cn" IN  {
+                type master;
+                file "tedu.cn.other";
+        };
+};
+
+
+RAID磁盘阵列：
+• 廉价冗余磁盘阵列
+– Redundant Arrays of Inexpensive Disks
+– 通过硬件/软件技术,将多个较小/低速的磁盘整合成一个大磁盘
+– 阵列的价值:提升I/O效率、硬件级别的数据冗余
+– 不同RAID级别的功能、特性各不相同
+
+• RAID 0,条带模式
+– 同一个文档分散存放在不同磁盘
+– 并行写入以提高效率
+– 至少有两块磁盘组成
+
+• RAID 1,镜像模式
+– 一个文档复制成多份,分别写入不同磁盘
+– 多份拷贝提高可靠性,效率无提升
+– 至少有两块磁盘组成
+
+• RAID5,高性价比模式
+– 相当于RAID0和RAID1的折中方案
+– 需要至少一块磁盘的容量来存放校验数据
+– 至少有三块磁盘组成
+
+• RAID6,高性价比/可靠模式
+– 相当于扩展的RAID5阵列,提供2份独立校验方案
+– 需要至少两块磁盘的容量来存放校验数据
+– 至少有四块磁盘组成
+
+
+• RAID 0+1/RAID 1+0
+– 整合RAID 0、RAID 1的优势
+– 并行存取提高效率、镜像写入提高可靠性
+– 至少有四块磁盘组成
+
+进程管理：
+标识：PID
+命令：
+查看进程树：
+	pstree
+	pstree [用户] 显示该用户正在使用的进程 [-a(显示完整的命令行)，-p(列出对应PID编号)]
+		例：pstree lisi -a -p或者直接可以写-ap
+				bash,1524
+  					└─vim,1577 das
+上帝进程：systemd--所有进程的父进程
+
+查看进程快照：
+	ps：
+		[选项]：
+			aux列出正在运行的所有进程。
+			-elf列出正在运行的所有进程，常用于查询进程的父进程。
+
+查看进程动态排名：
+	top
+	top -d 1  # 每各一秒刷新一次，在弹出表格按P以CPU占用排序，按M以内存占用排序。
+	
+pgrep：
+	pgrep：
+		-l输出进程名，而不仅仅是PID
+		-U检索指定用户的进程
+		例：pgrep -lU lisi  # 这里只能-lU不能-Ul。
+				6290 bash
+				6326 vim
+
+进程的前后台调度
+	例：oneko &  # 将oneko进程调到后台运行
+	jobs查看后台运行进程。
+	ctrl + z也可以将正在运行的进程调度到后台
+	ctrl + c才是停止或者说叫杀死进程
+	bg 2将后台编号为2的进程继续运行
+	fg 1将后台编号为1的进程恢复到前台继续运行
+	
+杀死进程：
+	killall -9 进程名  # -9 强制杀死
+	kill -9 PID
+	
+强制踢出用户
+	pkill -9 -U harry
+	killall -9 -U harry
+	
+	
+日志管理：
+	users	查看当前登陆用户名
+	who	查看当前登陆用户的信息
+	w	查看当前登陆用户的详细信息
+	last	查看登陆成功的用户信息
+	lastb	查看登陆失败的用户信息
+
+补充命令
+	统计：
+		wc -l 文件名
+			例：wc -l /etc/passwd
+					41 /etc/passwd --41表示有41行数据，也表示有41个用户
+				
+				find /etc/ -name "*.conf" -type f | wc -l
+					358 --找到/etc下以.conf结尾的文件有几个？
+

@@ -1,0 +1,21 @@
+nfs和samba的fstab写完以后有的时候开机自动挂载不上，需要人工执行mount -a 才能够正常挂载
+vim /etc/rc.d/rc.local
+到最后一行
+
+for  i   in {1..50}
+do
+mount -a
+sleep 5
+done
+
+保存退出
+
+
+
+chmod +x /etc/rc.d/rc.local
+
+
+
+
+
+

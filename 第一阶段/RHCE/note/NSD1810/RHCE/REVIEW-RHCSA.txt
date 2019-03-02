@@ -1,0 +1,352 @@
+﻿一、红帽考试及环境介绍
+1. RHCSA（红帽认证系统管理员）
+    全机试，时长150分钟
+    约16道题，满分300分（210分合格）
+
+2. RHCE（红帽认证工程师）
+    全机试，时长210分钟
+    约22道题，满分300分（210分合格）
+
+3. 考试环境说明（X为考生编号）
+    !!每名考生一台真实机，这台真机上提供虚拟机，答题全部在虚拟机中完成
+    !!桌面上会提供访问考试平台及虚拟机的快捷方式
+    !!由考官服务器提供所需软件、DNS/DHCP/集中认证等必要的资源
+    !!真实机： foundation.domainX.example.com
+    !!虚拟机-RHCSA部分：station.domainX.example.com
+    !!虚拟机-RHCE部分：system1.domainX.example.com、
+                                    system2.domainX.example.com
+
+
+二、练习环境说明
+1. 每人可使用3台虚拟机
+    !!虚拟机 classroom，相当于考官服务器：classroom.example.com
+    !!虚拟机 server，相当于答题机1：server0.example.com 
+    !!虚拟机 desktop，相当于答题机2：desktop0.example.com
+3. 快速重置练习环境
+    !! 按顺序执行，根据提示输入 y 确认
+    [root@room9pc13 ~]# rht-vmctl  reset  classroom
+    [root@room9pc13 ~]# rht-vmctl  reset  server
+    [root@room9pc13 ~]# rht-vmctl  reset  desktop
+
+
+    rht-vmctl 脚本控制参数说明：
+    rht-vmctl  reset  虚拟机名 		【断电-还原-开启虚拟机】
+    rht-vmctl  poweroff  虚拟机名 	【强制关闭虚拟机】
+    rht-vmctl  start  虚拟机名		【开启虚拟机】
+
+模拟考试要求：
+	上午 90分钟内完成，正确率 >= 90%
+	下午 150分钟内完成，正确率 >= 90%
+
+
+考试流程：
+  携带身份证、笔.  白纸
+  红帽考官提前布置考场环境，通知考生入场
+  听考官宣读考试纪律（禁止作弊、禁止交头接耳/东张西望、……）
+
+  听考官指示填写相关资料（身份证号、电子邮箱、姓名拼音、证书号）
+  单击“开始考试”后，倒计时开启
+
+  考试真机桌面 有访问考试系统图标
+  真机（RHEL7.3 有图形，无root权限）
+  虚拟机（RHEL7.0 没有图形界面，有root权限）
+
+  考试时如果需要做还原虚拟机、强制关机、开机、查看虚拟机界面
+
+  成绩邮件在考试之后5个工作日之内（当天晚上）
+
+
+  关于证书查询：
+	默认不对外提供，
+	如果希望查询到，需要到红帽官网注册一个账号，关联你的证书并设置允许被查询
+
+
+172.40.50.121
+RHCSA 核心考点列表
+####################################################
+
+
+
+
+
+一、开考准备 —— 
+1. 重设虚拟机的root密码【##】
+关键点：如何进入恢复模式（正常的系统根默认挂载到 /sysroot）
+1)重启虚拟机 server,出现 GRUB 启动菜单时按 e 键进入编辑状态
+2)找到 linux16 所在行,末尾添加 rd.break console=tty0,按 Ctrl+x 键进恢复模式
+3)以可写方式挂载硬盘中的根目录,并重设 root 密码:
+
+switch_root:/# 
+switch_root:/# mount -o remount,rw /sysroot
+switch_root:/# chroot /sysroot/
+sh-4.2# echo  密码  |  passwd  --stdin  root
+sh-4.2# touch  /.autorelabel
+sh-4.2# exit
+sh-4.2# reboot
+第一次重起过程会有点慢
+
+
+2. 为虚拟机配置网络 
+网卡名（内核识别的设备名）：eth0
+连接名（管理员指定的配置名）：eth0  （System eth0）
+
+系统服务：NetworkManager
+
+nmcli
+
+如果原来已经有现成的连接：
+1）修改连接配置
+# nmcli  con  mod  "连接名"  ipv4.method  manual  ipv4.addresses  "IPv4地址/掩码位数  默认网关地址"  ipv4.dns  DNS服务器地址  connection.autoconnect  yes
+2）激活新配置
+# nmcli  con  up  "连接名"
+
+关于RHEL7.2以上系统，默认网关配置：
+# nmcli  con  mod  .. ..  ipv4.gateway  默认网关地址
+
+
+
+二、系统管理任务 ——
+1. 添加YUM源
+3. 添加用户/组账号
+11. 配置用户账号
+4. 设置文件权限
+6. 建共用目录（SGID）
+5. 配置计划任务
+分 时  日 月 周
+
+
+7. 升级内核
+提供的资源：
+kernel-3.....rpm [v]  ==》右击，复制链接地址
+kernel-doc-3.....rpm
+
+# wget  内核文件的下载地址
+# rpm  -ivh  kernel-3.....rpm
+
+检查结果：
+# ls  /boot/vmlinuz*
+# uname  -r
+
+
+
+三、文档管理 ——
+13. 查找文件（find）
+
+以下提示忽略即可：
+find: ‘/proc/2035/task/2035/fdinfo/6’: 没有那个文件或目录
+find: ‘/proc/2035/fdinfo/6’: 没有那个文件或目录
+
+14. 检索文本（grep）
+16. 创建归档（tar）
+四、配置应用客户端 ——
+10. 设置NTP时间同步客户端
+8. 设置LDAP客户端 【##】
+LDAP服务安装包： sssd   authconfig-gtk
+工具：authconfig-tui   authconfig-gtk
+服务名：sssd
+
+......(图形操作)
+
+#systemctl   restart sssd
+#systemctl   enable sssd
+
+验证：id  ldapuser0 (如果有用户说明搭建的没有问题)
+
+如何解决LDAP用户家目录的问题？
+方式1：手动mount挂载NFS共享提供的目录
+
+方式2：通过autofs自动挂载/卸载NFS共享提供的目录
+1）当需要用XX用户的家目录时，自动创建挂载点（只能建一层目录）并挂载对应的共享
+2）当不需要用XX用户的家目录时，自动挂载对应的共享并删除挂载点
+
+yum -y  install  autofs
+
+9. 设置autofs触发挂载+NFS共享客户端 【##】
+配置关键：  /home/guests/ldapuser0
+1）让autofs帮管理员监控哪一个目录（挂载点目录的父目录）
+2）当需要访问一个子目录时，怎么操作（哪个目录对应哪个设备）？
+# mkdir  -p  /home/guests     //挂载点的的父目录
+#yum -y install autofs
+# vim  /etc/auto.master          //autofs服务的主配置文件
+  被监控的目录路径    自定义操作策略文件的路径（之前不存在）
+  /home/guests          /etc/auto.guests 
+#vim /etc/auto.guests            //操作策略文件的路径
+ 挂载点名 	-挂载参数		服务器地址:NFS共享目录的路径
+ldapuser0   -rw     classroom.example.com:/home/guest
+s/ldapuser0 
+
+*   -rw     classroom.example.com:/home/guests/&
+
+#systemctl restart autofs;systemctl enable autofs
+
+
+
+
+
+
+
+
+五、磁盘分区及存储 ——
+考试环境：
+    只有一块磁盘 /dev/vda （包括系统分区，有剩余空间）
+     /dev/vda1 ==> /boot
+     /dev/vda2 ==> systemvg(/分区 vo逻辑卷200M)
+     剩余空间
+
+     没有第二块磁盘
+
+练习环境：
+    有两块磁盘 /dev/vda （包括系统分区，无剩余空间）
+    /dev/vdb （空磁盘）
+
+自建环境（规划一下/dev/vdb）：
+A：
+    在磁盘 /dev/vdb 上按以下要求建立分区:
+    1)采用默认的 msdos 分区模式
+    2)第1个分区 /dev/vdb1 的大小为 200M  
+    3)第2个分区 /dev/vdb2 的大小为 2000M
+    4)第3个分区 /dev/vdb3 的大小为 1000M
+
+   # ls  /dev/vdb[1-3]
+   那刚才分这三个区，也是为了更接近我们的考试环境。在答题的时候这三个分区别动。
+
+B：
+   利用200M的分区简历卷组
+   从卷则里划分一个180M逻辑卷vo
+   格式化逻辑卷vo 挂载到/vo 并在/vo中创建文件
+
+
+
+
+如何解答考试时候的3个题目：
+A：分区准备
+      1）需要增加几个新分区？
+      2）这几个分区分别需要多大，预计给哪一道题目使用
+  
+    300-500 MiB —— 扩展逻辑卷
+    1000MiB —— 新卷组和逻辑卷
+    512MiB —— 交换分区
+
+    确定分区表的类型【dos gpt】
+    # fdisk  -l  /dev/vdb
+    。。 。。
+    磁盘标签类型：dos	【gpt】
+
+B：调整分区
+
+  dos模式
+    # fdisk  /dev/vdb 			
+    : p
+    : n ==> e，分区编号默认，起始位置默认，结束位置默认
+    : n ==> 类型l，编号默认，起始位置默认，结束位置+500M
+    : n ==> 类型l，编号默认，起始位置默认，结束位置+1000M
+    : n ==> 类型l，编号默认，起始位置默认，结束位置+512M
+    : p
+    : w
+    # partprobe  /dev/vdb
+   # reboot
+
+  gpt模式：
+    # gdisk  /dev/vdb 			
+    ...新建三个主分区
+    : w
+    # partprobe  /dev/vdb
+    # reboot
+
+C：分别答题
+
+
+15. 添加逻辑卷
+
+2. 扩展逻辑卷
+   逻辑卷vo在考试时是预先提供好的
+
+  识别文件系统的类型：
+  # blkid  文件系统
+
+  刷新文件系统大小：
+  # resize2fs  文件系统
+  # xfs_growfs  文件系统
+
+
+
+12. 添加交换分区
+
+####################################################
+
+RHCSA部分 —— 
+
+答题顺序：
+1）看考试说明（提供地址、用户、软件资源、注意事项）
+2）整体浏览所有考试题（用户/权限、分区）
+3）过重设密码+配置网络两关
+4）先做高风险题（分区操作、装新内核）
+5）再答其他题目
+
+交卷处理：
+1）先把虚拟机关机
+2）再重新开启虚拟机
+3）检查所有答题结果
+4）告知考官交卷
+
+
+整体注意事项 ——
+1）防火墙的处理
+    考试时不要求，可以关闭或忽略
+2）SELinux的处理
+    考试时有可能会要求不能disabled，对重设密码有影响，对其他题目没影响
+3）yum软件源
+    由考官服务器提供，需要手动指定使用这个源（有对应考题）
+
+
+其他注意事项 ——
+1）重设root密码时
+进恢复模式时，改内核参数 rd.break  console=tty0
+touch  /.autorelabel 文件名不要写错为 /.autorelable
+2）从nmcli命令行配置网络时
+关于默认网关的配置，
+如果是RHEL7.0
+nmcli ..  ipv4.addresses  "IPv4地址/掩码位数  默认网关"
+如果是RHEL7.2及以上
+nmcli ..  ipv4.gateway  "默认网关"
+3）为虚拟机指定yum源
+必要时可以清空旧配置 
+# rm  -rf   /etc/yum.repos.d/*.repo
+别忘了禁用软件签名检查
+# vim  /etc/yum.conf
+gpgcheck=0
+4）逻辑卷扩容
+被扩展的逻辑卷vo考试是是现成的、已经格式化过的
+完成扩容后要记得刷新文件系统大小（resize2fs或xfs_growfs）
+千万不要再格式化
+5）配置cron计划任务
+执行时间点的各种写法，任务命令操作直接从题目复制
+6）内核升级
+建议先下载内核安装文件 kernel-版本号.rpm，确认结果
+安装时使用 rpm  -ivh  。。。rpm，千万别用 rpm  -Uvh
+安装过程需要耐心等待，千万不要Ctrl c中断，也不要关闭终端
+7）LDAP客户端
+使用authconfig-tui命令去配置，
+配置过程中提示下载证书时先不要按OK（另开终端连过去，把证书下载好以后再返回再OK）
+8）autofs配置
+按题目要求只需要实现自动挂载 ldapsuerX 一个用户
+如果配置适用于所有用户也可以
+如果LDAP用户的家目录是通过NFSv3共享的，挂载参数需要添加 v3
+# vim  /etc/策略文件
+ldapuser0	-rw,v3	服务器地址:目录路径		
+9）NTP网络时间客户端
+有可能chrony包已经装好，但是 /etc/chrony.conf文件中有错误
+可以先删除错误的配置文件
+# rm  -rf  /etc/chrony.conf
+再重装chrony包
+# yum  -y  reinstall  chrony
+10）分区规划操作
+先总览所有题目，确定需要分几个区、每个分区的大小
+再执行分区操作，fdisk分区过程中尽量不要用d
+分区保存后记得partprobe刷新，再重起虚拟机
+11）创建逻辑卷
+如果新建卷组时忘记指定PE大小
+可以删除这个卷组，再重新创建（添加 -s  PE大小）
+12）所有题目中要求的文件名/格式、文件路径要一致
+﻿
+

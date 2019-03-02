@@ -1,0 +1,214 @@
+RHCSA 核心考点列表
+####################################################
+
+一、开考准备 —— 
+1. 重设虚拟机的root密码【##】
+关键点：如何进入恢复模式（正常的系统根默认挂载到 /sysroot）
+1)重启虚拟机 server,出现 GRUB 启动菜单时按 e 键进入编辑状态
+2)找到 linux16 所在行,末尾添加 rd.break console=tty0,按 Ctrl+x 键进恢复模式
+3)以可读写方式挂载硬盘中的根目录,并重设 root 密码:
+
+switch_root:/#				//恢复模式
+switch_root:/# mount -o remount,rw /sysroot
+switch_root:/# chroot /sysroot/
+sh-4.2#					//正常的根目录环境
+sh-4.2# echo  密码  |  passwd  --stdin  root
+sh-4.2# touch  /.autorelabel	//标记下次重做selinux标签
+sh-4.2# exit  				//退出根环境
+switch_root:/# reboot  		//退出恢复模式并重启 
+第一次重起过程会有点慢
+
+
+
+
+
+2. 为虚拟机配置网络 
+网卡名（内核识别的设备名）：eth0
+连接名（管理员指定的配置名）：eth0  （System eth0）
+
+如果原来已经有现成的连接：
+1）修改连接配置
+# nmcli  con  mod  "连接名"  ipv4.method  manual  ipv4.addresses  "IPv4地址/掩码位数  默认网关地址"  ipv4.dns  DNS服务器地址  connection.autoconnect  yes
+2）激活新配置
+# nmcli  con  up  "连接名"
+
+关于RHEL7.2以上系统，默认网关配置：
+# nmcli  con  mod  .. ..  ipv4.gateway  默认网关地址
+
+如果原来没有任何现成的连接：
+1）先添加连接
+# nmcli  con  add  con-name  连接名   ifname  网卡名  type  ethernet
+2）再修改连接配置
+3）激活新配置
+
+
+
+二、系统管理任务 ——
+1. 添加YUM源
+3. 添加用户/组账号
+11. 配置用户账号
+4. 设置文件权限
+6. 建共用目录（SGID）
+
+mkdir  -m  权限模式  目录名
+
+5. 配置计划任务
+按照事先计划好的时间执行指定的任务
+
+格式：
+分  时  日  月  周  命令行
+
+
+crontab -e 【-u  用户名】  
+crontab -l  【-u  用户名】
+crontab -r  【-u  用户名】
+
+7. 升级内核
+提供的资源：
+kernel-3.....rpm [v]  ==》右击，复制链接地址
+
+安装方式：
+# wget  内核文件的下载地址
+# rpm  -ivh  kernel-3.....rpm
+
+检查结果：
+# uname  -r
+
+
+
+
+三、文档管理 ——
+13. 查找文件（find）
+以下提示忽略即可：
+find: ‘/proc/2035/task/2035/fdinfo/6’: 没有那个文件或目录
+find: ‘/proc/2035/fdinfo/6’: 没有那个文件或目录
+
+14. 检索文本（grep）
+16. 创建归档（tar）
+
+
+
+四、磁盘分区及存储 ——
+15. 添加逻辑卷
+2. 扩展逻辑卷
+12. 添加交换分区
+
+在计算机上使用磁盘空间的过程：
+识别磁盘 --> 分区 --> 格式化 --> 挂载  --> 访问挂载点
+fdisk -l  -->  fdisk/parted --> mkfs相关 --> mount --> ls、vim
+
+磁盘分区操作 ——
+fdisk  -l
+fdisk  /dev/vdb 
+parted  /dev/vdb
+
+分区模式msdos：
+     四个主分区、扩展分区、逻辑分区
+分区模式gpt（支持>2T空间）：
+     主分区
+
+刷新硬盘分区表：
+     partprobe  /dev/vdb 或者 partx  -a  /dev/vdb
+     reboot
+
+格式化操作：
+mkfs.ext3/4 分区设备
+mkfs.xfs   分区设备
+
+LVM逻辑卷管理机制 ——
+把零散的分区 ===》整编的大卷组 ===》 根据需要获取空间
+优势：动态调整卷的大小，不影响用户的使用
+
+识别磁盘 --> 分区 -->      卷组 -->  逻辑卷 -->      格式化 -->       挂载      -->  访问挂载点
+
+实现方式：
+分区/物理卷（2G、4G、6G） --> 卷组（12G） --> 逻辑卷（10G、1G）
+
+LVM管理工具 ——
+    物理卷操作：pvcreate、pvscan、pvdisplay、
+    卷组操作：vgcreate、vgextend、vgscan、vgdisplay、vgremove
+    逻辑卷操作：lvcreate、lvextend、lvscan、lvdisplay、lvremove、
+
+PE：分配逻辑卷空间的时候，最小的单位
+
+创建卷组：
+   vgcreate  [-s  PE大小]  卷组名  分区.. ..
+创建逻辑卷：
+   lvcreate  -L  大小  -n  名称   卷组名
+   lvcreate  -l  PE个数  -n  名称   卷组名
+扩展逻辑卷：
+   lvextend  -L  +大小  /dev/卷组名/逻辑卷名
+   resize2fs  /dev/卷组名/逻辑卷名
+		【!! vgextend、xfs_growfs】
+
+交换分区控制 ——
+交换分区：虚拟内存，一般设置成物理内存的1~2倍，<16G
+格式化交换分区：
+      mkswap   设备路径
+启用/停止控制：
+      swapon   设备路径
+      swapoff   设备路径
+查看交换分区使用情况：
+     swapon  -s
+     free
+
+
+考试环境的磁盘情况：
+虚拟机只有一块磁盘 /dev/vda （包括 /boot 、卷组、剩余空间）
+
+练习环境的磁盘情况：
+虚拟机有磁盘 /dev/vda（包括 /boot等，没有剩余空间） 
+虚拟机有磁盘 /dev/vdb（空磁盘，全部空闲）
+
+
+五、配置应用客户端 ——
+10. 设置NTP时间同步客户端
+软件包：chrony
+配置文件：/etc/chrony.conf
+server  NTP服务器的地址
+服务：chronyd
+
+可能遇到一个小坑：
+可能chrony包已经安装，而且提供的配置文件是错误的
+解决办法：
+# rm  -rf  /etc/chrony.conf
+# yum  -y  reinstall  chrony
+# vim  /etc/chrony.conf
+.. ..
+
+8. 设置LDAP客户端 【##】
+装包：sssd
+配置工具：authconfig-tui
+系统服务：sssd
+
+熟悉英文界面：
+# LANG=   authconfig-tui
+
+问题：配置界面卡死、虚拟机死机
+原因：内存不够
+解决：把虚拟机强制关机、重新开
+
+
+如何解决LDAP用户家目录的问题？
+方式1：手动mount挂载NFS共享提供的目录
+
+方式2：通过autofs自动挂载/卸载NFS共享提供的目录
+1）当需要用XX用户的家目录时，自动创建挂载点（只能建一层目录）并挂载对应的共享
+2）当不需要用XX用户的家目录时，自动挂载对应的共享并删除挂载点
+
+
+9. 设置autofs触发挂载+NFS共享客户端 【##】
+配置关键：
+1）让autofs帮管理员监控哪一个目录（用户家目录的父目录）
+2）当需要访问一个子目录时，怎么操作（哪个目录对应哪个设备）？
+
+# mkdir  -p  用户家目录的父目录
+
+# vim  /etc/auto.master
+被监控的目录路径 		自定义操作策略文件的路径
+
+# vim  操作策略文件的路径
+挂载点名 	-挂载参数		服务器地址:NFS共享目录的路径
+
+
+####################################################

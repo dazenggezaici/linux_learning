@@ -1,0 +1,150 @@
+Nginx代理：  # 实现功能：负载均衡，本身不提供网站，做调度器的功能
+客户端==>>Nginx代理服务器------>web1
+			     |----->web2
+客户端只需要能与Nginx代理服务器通信，web1和web2网页内容一致，
+客户端在访问需要网页时可以由web1提供,也可以web2提供。
+nginx代理配置：  # 默认调度算法：轮循
+./nginx/conf/nginx.conf
+...
+upstream webserver{  # 这里的webserver是名称
+	server 192.168.2.100;
+	server 192.168.2.200;
+}
+server{
+	...
+	location / {
+		proxy_pass http://webserver;  # 这里webserver要与
+						# upstrxxx后面名称一致
+	}
+	...
+}
+...
+
+upstream name {
+	server host weight=2;  # 修改权重，权重越大，调用次数就越高,默认值为1。
+	server host max_fails=1 fail_timeout=20;  # max_fails设置最大失败次数
+					# fail_timeout设置失败超时时间，单位为秒
+					# 该时间是，确认机器失联后，等20s后再去联系主机
+	server host down;  # down标记服务器已关机，不参与集群调度,长时间无法修复的
+					# 主机
+}
+
+nginx代理设置，相同客户端访问相同服务器
+...
+upstream name {
+	ip_hash; # 设置同一客户端访问时，调度上次给该客户端访问的服务器
+	...
+}
+以上代理为7层http代理，只适用于http协议
+以下部署支持4层TCP/UDP代理的nginx服务器，可以做任何软件的代理
+需要彻底重装nginx，且在./configure后加上 --with-stream
+./configure --prefix=/nginx --user=nginx --group=nginx --with-http_ssl_module --with-stream
+配置./nginx/conf/nginx.conf
+stream {
+	...
+	upstream name {
+		server host:端口;
+		server host1:端口;
+	}
+	server {
+		listen 对应端口;  # 在实验时不能用22端口，因为我们在操作虚拟机时用了22端口
+		proxy_pass name;  # 该name与上面upstream后的名称一致
+	}
+	...
+}
+# 一定要写在http前,stream与http选项是同级的
+http {
+	......
+}
+然后用ssh -p 对应端口  来验证
+
+优化nginx
+1、优化报错页面
+server{
+	error_page	404		/404.html  # 然后编写网页根目录下的404.html文件即可
+}
+2、安装--with-http_stub_status_module模块
+killall -9 nginx
+rm -rf ./nginx/
+cd /opt/nginx-1.12.2
+./configure --prefix=/nginx --user=nginx --group=nginx --with-http_ssl_module --with-stream --with-http_stub_status_module
+
+配置信息：
+server{
+	location /status{
+		stub_status on;
+	}
+}
+压力测试命令：
+ab -c 200 -n 200  http://192.168.4.6/  # 一人访问一次
+-c多少人
+-n多少次（总访问量）
+
+nginx优化并发量：
+修改配置：./nginx/conf/nginx.conf
+worker_processes 进程数，一般按照机器CPU内核数(核心数)来确定，1:1(一比一)
+events {
+    worker_connections  1024;  # 并发量
+}
+优化linux内核：默认限制打开1024个文件
+ulimit -a  # 查看linux系统限制规则
+ulimit -Hn 值  # 修改硬限制，强制限定,这里的值一定比软限制高，临时
+ulimit -Sn 值  # 修改软限制，规定限制，临时
+永久生效可以通过修改/etc/security/limits.conf配置文件下的
+*	soft nofile 值
+*	hard nofile 值
+优化nginx数据包头的缓存
+http {
+	client_header_buffer_size 1M;  # 默认请求包信息的缓存1k
+	large_client_header_buffers 4 1M;  # 大请求包头部信息的缓存个数与容量
+}
+优化图片视频缓存时间
+server{
+	location ~* \.(jpg|avi)${
+		expires 30d;
+	}
+}
+优化日志，切割日志
+mv access.log access.bak
+kill -USR1 nginx.pid
+对页面进行压缩处理
+http {
+gzip on;                            //开启压缩
+gzip_min_length 1000;                //小文件不压缩,单位字节
+gzip_comp_level 4;                //压缩比率 （1-9）
+gzip_types text/plain text/css application/json application/x-javascript text/xml application/xml application/xml+rss text/javascript;
+                                    //对特定文件压缩，类型参考mime.types
+}
+优化文件缓存
+http {
+open_file_cache          max=2000  inactive=20s;
+open_file_cache_valid    60s;
+open_file_cache_min_uses 5;
+open_file_cache_errors   off;
+//设置服务器最大缓存2000个文件句柄，关闭20秒内无请求的文件句柄
+//文件句柄的有效时间是60秒，60秒后过期
+//只有访问次数超过5次会被缓存
+}
+
+nginx并发理论值
+静态网站（万）
+动态网页（百）<1000
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

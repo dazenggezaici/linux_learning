@@ -1,0 +1,350 @@
+﻿
+
+资料下载：
+   http://172.40.50.113/rhce/
+
+
+考试环境真机：RHEL7.2
+考试环境虚拟机：RHEL 7.0（没桌面）
+	system1、system2
+
+交卷之前：
+    1. 先关机 system2，然后再关机 system1
+    2. 先开机 system1，然后再开机 system2
+    3. 检查答题结果
+
+
+练习环境：
+   依次重置classroom、server、desktop
+﻿
+
+RHCE 核心考点列表
+####################################################
+
+一、安全策略配置 ——
+1. 配置SELinux
+# vim  /etc/selinux/config
+SELINUX=Enforcing
+# setenforce  1
+
+2. 配置SSH访问（+防火墙）
+在两个虚拟机上
+# vim /etc/ssh/sshd_config
+.. ..
+DenyUsers 用户名@客户机地址
+DenyUsers *@172.34.0.*
+
+
+3. 自定义用户环境（别名设置）
+# vim /etc/bashrc
+.. ..
+alias  qstat='实际执行的命令'
+# 重新登录。。。
+# qstat
+
+
+4.  配置防火墙端口转发
+# systemctl  enable  firewalld
+# systemctl  restart  firewalld
+
+在system1上：
+1）允许任何主机访问
+# firewall-cmd  --set<tab>=tr<tab>
+2）拒绝指定的网段访问
+# firewall-cmd  --permanent  --zone=block  --add-source=需要拒绝的网段
+# firewall-cmd  --reload
+3）配置端口1转发到端口2
+# firewall-cmd  --permanent  --zone=trusted  --add-forward-port=被转发端口:协议:目标端口
+# firewall-cmd  --permanent  --zone=trusted  --add-forward-port=port=5423:proto=tcp:toport=80
+# firewall-cmd  --reload
+
+在system2上：
+1）允许任何主机访问
+2）拒绝指定的网段访问
+
+常见的防火墙故障：
+No route  to  host 。。。
+Destination host  unreachable 。。。
+
+
+
+二、网络连接配置 ——
+5. 配置链路聚合
+1）创建聚合连接team0
+man  nmcli-examples，查找Team1，获取命令示例：
+           $ nmcli con add type team con-name Team1 ifname Team1 config team1-master-json.conf
+           $ nmcli con add type team-slave con-name Team1-slave1 ifname em1 master Team1
+           $ nmcli con add type team-slave con-name Team1-slave2 ifname em2 master Team1
+
+==》
+# nmcli con add type team con-name 聚合连接名 ifname 聚合连接的设备名 config '{类型设置}'
+
+man  teamd.conf，查找"runner，获取类型设置的帮助
+"runner": {"name": "activebackup"}
+或者
+"runner": {"name": "roundrobin"}
+
+2）添加成员网卡
+# nmcli con add type team-slave con-name 成员连接1名 ifname 额eth1 master 聚合连接名
+# nmcli con add type team-slave con-name 成员连接2名 ifname eth2 master 聚合连接名
+
+3）配置IP地址
+# nmcli con mod "聚合连接名"  ipv4.method  manual  ipv4.addresses "IPv4地址/掩码长度  默认网关"  connection.autoconnect  yes
+# nmcli con mod "成员连接1名"  connection.autoconnect  yes
+# nmcli con mod "成员连接2名"  connection.autoconnect  yes
+
+4）激活并测试聚合连接
+# nmcli con up "聚合连接名"  
+# teamdctl  team0  state
+# ping  对方主机的聚合连接的IP地址
+
+
+6. 配置IPv6地址
+# nmcli  connection  show
+# nmcli  connection  modify  "连接名"  ipv6.method  manual ipv6.addresses  "IPv6地址/掩码[  IPv6网关]"  connection.autoconnect  yes
+
+# hostnamectl  set-hostname  主机名
+# ping6  IPv6地址
+
+测试方式：
+# ifconfig 
+# route  -n
+# cat  /etc/resolv.conf
+# host  本机IP地址
+
+
+三、配置邮件服务器 ——
+7. 配置本地邮件服务
+
+考试的环境：
+system1、system2都要配置成空客户端服务器
+后端的邮件服务器由考官提供
+
+练习的环境：
+server0配置成空客户端服务器
+后端的邮件服务器由desktop0来提供【lab smtp-nullclient setup】
+
+# yum  -y  install  postfix
+# vim  /etc/postfix/main.cf
+.... 查找、修改的方式
+relayhost = [自动路由到的目标地址]
+inet_interfaces = loopback-only
+myorigin = 显示来自于。。。地址
+mynetworks = 127.0.0.0/8 [::1]/128
+mydestination = 
+local_transport = error:报错提示信息
+
+!!! 检查邮件练习配置：lab smtp-nullclient grade
+!!! 排错依据 less  /var/log/maillog
+
+
+四、配置文件服务器/客户端 —— 
+8. 通过Samba发布共享目录
+!!! 准备共享目录、设置权限
+!!! SELinux策略调整： setsebool  -P  samba_export_all_rw=1
+!!! 测试
+# smbclient  -L  服务器地址
+# smbclient  -U  用户名   //服务器地址/共享名
+
+9. 配置多用户Samba挂载
+
+# yum  -y  install  cifs-utils
+# vim  /etc/fstab
+//服务器地址/共享名		挂载点	cifs	username=用户名,password=密码,multiuser,sec=ntlmssp,_netdev	0 0 
+# mount  -a
+
+# su  -  普通用户
+# cifscreds  add  -u  共享用户名  服务器地址
+Password:共享用户名的密码
+# touch  挂载点/a.txt
+
+
+10. 配置NFS共享服务
+
+安全NFS的前提条件：
+参与NFS访问的虚拟机需要加入同一个kerberos认证区域【考试时现成的】
+部署kerberos密钥 /etc/krb5.keytab
+
+!!! klist  -k  /etc/krb5.keytab 检查密钥内容
+
+
+NFS v1、v2、v3、v4
+# vim  /etc/sysconfig/nfs
+.. ..
+RPCNFSDARGS="-V 4"  	===> 客户端对应的挂载参数 v4
+
+
+11. 挂载NFS共享
+
+!!! 系统服务 —— 
+NFS服务器上：nfs-server.service、nfs-secure-server.service
+NFS客户机上：nfs-secure.service 
+# vim  /etc/fstab
+服务器地址:目录路径		挂载点	nfs	sec=krb5p,_netdev	0 0 
+
+
+
+问题：客户机重起后部分网络文件系统需要手动mount -a才能挂上
+解决办法：
+# vim  /etc/rc.local
+for  i  in  {1..20}
+do
+	mount  -a
+	sleep 5
+done
+
+
+
+19. 配置iSCSI服务端
+Internet SCSI网络存储
+配置工具：targetcli
+
+用途：为客户机提供网络磁盘柜（target），每个磁盘柜包括至少1块逻辑磁盘（lun）
+1）准备实际可用的空闲存储设备（硬盘、分区、逻辑卷……）
+2）使用targetcli创建磁盘柜，并且配置磁盘柜
+> /backstores/block  create  后端存储名  实际存储设备路径
+> /iscsi  create  磁盘柜IQN名
+> /iscsi/<tab>/../luns  create  后端存储设备名
+> /iscsi/<tab>/../acls  create  客户机的IQN名称 
+> /iscsi/<tab>/../portals  create  本机IP地址  端口
+3）起服务
+# systemctl  restart  target
+
+
+
+20. 配置iSCSI客户端
+
+在客户机指定IQN名称：
+# vim /etc/iscsi/initiatorname.iscsi
+InitiatorName=iqn.2016-02.com.example:desktop0
+# systemctl restart iscsid
+
+软件包：iscsi-initiator-utils
+连接工具：iscsiadm
+用途：发现、连接服务器提供的网络磁盘柜
+
+发现iSCSI存储目标：
+# iscsiadm -m discovery  -t st -p 服务器地址:端口
+连接iSCSI存储目标：
+# iscsiadm -m node -L all
+
+配置开机自动连接存储目标：
+# vim  /var/lib/iscsi/nodes/<tab>.../default
+查找startup，把第2个startup的值改成 atuomatic
+# systemctl  enable  iscsi
+
+问题：iSCSI客户机配置挂载之后reboot卡死
+解决办法：
+改用 sync ; reboot  -f 来重起
+
+# vim  /etc/bashrc
+.. ..
+alias  reboot='sync ; reboot  -f'
+# 重新登录一次
+。。。
+# reboot
+
+
+五、配置网站服务器 ——
+12.实现一个web服务器
+13.配置安全web服务
+# yum  -y  install  mod_ssl
+# vim  /etc/httpd/conf.d/ssl.conf
+。。 。。
+
+14.配置虚拟主机
+15.配置web内容的访问
+<Directory  目录路径>
+	Require ip 客户机的地址 .. ..
+</Directory>
+
+16.实现动态WEB内容
+# yum  -y  install mod_wsgi
+# vim ....
+Listen 8909
+<VirtualHost  *:8909>
+      .. ..
+   WSGIScriptAlias  /  Python脚本程序的路径
+</VirtualHost>
+
+SELinux机制的问题：
+1）开放非标准端口
+# less  /var/log/messages 或 sealert
+.. .. 查找 8909 获取提示
+# semanage  port -a -t http_port_t -p tcp 8909  
+# semanage  port -l  | grep  http_
+2）使用非标准的Web目录
+尽量指定 /var/www/* 这些目录
+# chcon  -R  --reference=/var/www  自定义目录
+
+!!! 每一个站点都做虚拟主机，并且使用独立的配置文件 /etc/httpd/conf.d/编号-站点名.conf
+!!! 检查语法：httpd  -t
+
+获取httpd配置帮助：
+# yum  -y  install  httpd-manual
+# systemctl restart  httpd
+# firefox  http://服务器地址/manual
+
+# rpm  -ql  mod_wsgi
+.. ..
+# less /usr/share/doc/mod_wsgi-3.4/README
+
+
+
+六、Shell脚本编程 —— 
+17. 创建一个脚本
+18. 创建一个添加用户的脚本
+
+!!! 脚本的名称、路径
+
+/root/batchusers
+Input file not found
+
+
+七、配置及管理数据库 ——
+21. 配置一个数据库
+# yum  -y  install  mariadb-server  mariadb
+# systemctl  restart mariadb
+# mysqladmin  -uroot  password  '新密码'
+# mysql -uroot -p新密码
+。。 。。
+
+
+!!! 恢复数据库系统
+# rm  -rf  /var/lib/mysql
+# yum  -y  reinstall  mariadb-server  mariadb
+
+
+
+22. 数据库查询（填空）
+# mysql -uroot -p新密码 
+MariaDB> USE  Contacts;
+MariaDB> DESC 表明;
+MariaDB> select  子段1,子端2  from  库名.表名  where  password='solicitous';
+
+
+First name   Last name
+
+SELECT count(*) FROM 表1,表2 WHERE 表1.字段1='Barbara'
+表2.字段2='Sunnyvale' AND 表1.字段3=表2.字段3;
+
+####################################################
+
+
+模拟考试：
+[root@room9pc13 ~]# rht-vmctl  reset  classroom
+[root@room9pc13 ~]# rht-vmctl  reset  server
+[root@room9pc13 ~]# rht-vmctl  reset  desktop
+
+[root@room9pc13 ~]# firefox  http://localhost/exam  
+
+
+辅助评测脚本：
+[root@room9pc13 ~]# rht-labcheck
+
+server0 ....
+
+desktop0 ....
+
+100%
+

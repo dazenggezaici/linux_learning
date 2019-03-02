@@ -1,0 +1,53 @@
+一、权限和归属：
+1、基本权限方式：读取、写入、可执行：r、w、x。
+2、权限适用对象（归属）：
+	--所有者：拥有此文件/目录的用户-user--u
+	--所属组：拥有此文件/目录的组-group--g
+	--其他用户：除所有者、所属组以外的用户-other--o
+3、查看文件（路径）权限：
+	使用ls -l（查目录下的文件），ls -ld（查看目录本身），例：
+	以/etc/passwd文件为例：
+		-rw-r--r--. 1 root root 2005 1月   5 09:31 /etc/passwd，解释如下：
+	第一个‘-’表示是文件（‘d’表示是路径，‘l’表示是快捷方式），‘rw-’所有者的权限，‘r--’所属组成员的权限，‘r--’其他用户的权限，‘1’表示软（硬）连接，‘root’所有者，‘root’所属组，‘2005 1月   5 09:31’日期和文件大小，‘/etc/passwd’文件（路径）地址。
+
+4、修改权限（chmod）:
+	--chmod [-R 递归修改] 归属关系+-=权限类别 /文档。
+	扩展：chmod [0,3,5,7],0表示---,3表示-wx,5表示r-x，7表示rwx。
+5、修改所有者、所属组（chown）：
+	--chown user:group /文件，例如：
+		chown lisi:tarena /nsd03
+		chown 所有者:所属组 /文件，可以直接chown :group /xxx直接修改所属组。
+	特殊情况(匹配即停止)，例：
+	ls -ld /liru --> drw-r-x---. 1 lisi tarena xxxxx(时间大小不用理) /liru
+	id lisi --> （前面的uid,gid不用理） 组=1001（tarena）
+	----上面的结果就是lisi只有rw，虽然lisi属于tarena组，但是linux在匹配的时候是
+		按照顺序匹配，在匹配到lisi是所有者的时候，直接给予所有者的权限，后面的
+		所有（组和其他人的权限）不会理会。
+
+二、附加权限（特殊权限）:
+Set GID--s(S)
+该方法适用与目录，因为linux中文件权限默认是不会继承的，该方法就是把文件夹继承的开关打开。
+总结：传递所属组身份，且不会继承所有者。
+	命令：chmod g+s /路径
+
+三、ACL访问控制列表：
+--能够对个别用户、个别组设置独立权限
+getfacl:查看文档ACL：getfacl /路径
+setfacl:设置文档ACL：
+	setfacl [-m(编辑，设置),-b(清空策略)] {u:用户:[rwxs],g:组:[rwxs]} /文档
+		注：清空策略后面就不用u:..这些，直接清空文档的所有acl,
+			如果只想删除一条策略的话是-x。
+
+四、使用LDAP认证：
+实现网络用户认证，达到用户信息的集中管理。
+客户端：1、需要安装sssd包。
+	2、安装authconfig-gtk图形工具
+	3、配置authconfig-gtk。
+		DN:dc=example,dc=com
+		LDAP服务器：classroom.example.com
+		CA证书：http://classroom.example.com/pub/example-ca.crt
+	4、重启sssd服务。
+	4、把用户在服务器的家目录挂载：
+		mount classroom.example.com:/home/guests /挂载点
+
+

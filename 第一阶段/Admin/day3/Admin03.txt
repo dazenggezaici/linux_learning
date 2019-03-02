@@ -1,0 +1,447 @@
+
+
+
+
+
+如何编写命令行
+
+什么是命令?
+• Linux命令
+– 用来实现某一类功能的指令或程序                
+     执行大多数命令,找到相应程序进行运行
+[root@A ~]# ls /usr/bin/ls           #绿色:可以执行的程序
+/usr/bin/ls
+[root@A ~]# ls /usr/bin/hostname
+/usr/bin/hostname
+[root@A ~]# 
+
+– 命令的执行依赖于解释器(默认解释器:/bin/bash)
+
+     用户命令----->解释器-------> 内核------>硬件
+         
+####################################################
+• Linux命令的分类
+– 内部命令:属于解释器的一部分
+– 外部命令:解释器之外的其他程序
+
+#####################################################
+命令行的一般格式
+• 基本用法
+– 命令字     [选项]...       [参数1]      [参数2]...
+
+[root@server0 ~]# ls -l /root/
+
+
+
+快速编辑技巧
+• Tab键自动补全
+ – 可补齐命令字、选项、参数、文件路径、软件名、服务名
+
+[root@A ~]# if(tab)(tab)    #连续两次tab键,显示以if开头的命令
+[root@A ~]# ifco(tab)        
+
+[root@A ~]# ls /etc/sysconfig/network-scripts/ifcfg-eth0 
+
+]# ls /et(tab)/sysco(tab)/netw(tab)-(tab)/ifc(tab)-e(tab) 
+
+]# ls -l /et(tab)/sysco(tab)/netw(tab)-(tab)/ifc(tab)-e(tab)
+
+[root@A ~]# hostname
+[root@A ~]# cat /etc/redhat-release
+
+
+
+
+• 快捷键
+– Ctrl + c:废弃当前编辑的命令行(结束正在运行的命令)
+– Esc + . 或 Alt + . :粘贴上一个命令的参数
+– Ctrl + l:清空整个屏幕
+
+[root@A ~]# ls /etc/redhat-release 
+[root@A ~]# ls -l  Alt + .
+[root@A ~]# cat  Alt + .
+[root@A ~]# cat -n  Alt + .
+
+– Ctrl + u:清空至行首
+– Ctrl + w:往回删除一个单词(以空格界定)
+####################################################
+mount挂载操作
+
+  从系统光盘中获得软件包, 软件包的管理中
+
+Windows:识别光盘内容
+   
+      光盘----->光驱设备------>CD驱动器(双击设备的访问点)
+
+Linux:识别光盘内容,在Linux中访问设备内容,必须通过访问点                 
+   
+      光盘------->光驱设备---------->目录 /abc (访问点)
+            /dev/cdrom
+
+      洞口----->煤矿
+
+1.图形将光盘镜像文件放入虚拟光驱设备
+2.命令行查看光驱设备文件
+[root@A ~]# ls /dev/cdrom         #青色:代表快捷方式
+/dev/cdrom
+[root@A ~]# ls -l /dev/cdrom
+
+[root@A ~]# ls /dev/sr0    #真正的光驱设备名
+	
+3.创建目录
+• 使用mount命令
+– 格式:mount 设备路径    挂载点目录      #让目录成为设备的访问点
+[root@A ~]# mkdir /abc
+[root@A ~]# ls /abc
+[root@A ~]# mount  /dev/cdrom  /abc
+mount: /dev/sr0 写保护，将以只读方式挂载
+[root@A ~]# ls /abc/
+[root@A ~]# ls /abc/Packages/
+
+总结:
+    1.Linux访问点为一个目录
+    2.mount命令,让目录成为设备的访问点
+      3.一个设备可以有多个访问点,一个访问点不可以有多个设备
+
+4.卸载:  umount   挂载点路径
+[root@A ~]# ls /abc
+
+[root@A ~]# umount /abc
+[root@A ~]# ls /abc
+[root@A ~]# mkdir /dvd
+[root@A ~]# mount /dev/cdrom  /dvd
+[root@A ~]# ls /dvd
+
+[root@A ~]# mount /dev/cdrom  /abc
+[root@A ~]# ls /abc
+
+注意事项:
+     1.卸载:当前路径不要在访问点路径内
+   [root@A dvd]# umount /dvd/
+   umount: /dvd：目标忙。
+        (有些情况下通过 lsof(8) 或 fuser(1) 可以
+         找到有关使用该设备的进程的有用信息)
+   [root@A dvd]# 
+      2.访问点的选择,建议自己创建目录
+
+##################################################
+目录和文件管理
+
+使用pwd、cd
+• pwd — Print Working Directory
+– 用途:查看当前工作目录
+
+• cd — Change Directory
+– 用途:切换工作目录
+– 格式:cd [目标文件夹位置]
+
+    . 表示当前目录
+    .. 表示父目录
+
+   ~user表示用户user的家目录
+     ~表示用户的家目录
+     家目录: 存放用户 自定义 或 个性化  数据的目录
+   /root:管理员root的家目录
+   /home:存放所有普通用户的家目录
+[root@A /]# cd ~root   #去往root的家目录
+[root@A ~]# pwd
+
+[root@A ~]# cd  ~lisi    #去往lisi的家目录
+[root@A lisi]# pwd
+
+[root@A lisi]# useradd tom         #创建用户tom
+[root@A lisi]# useradd zhangsan    #创建用户zhangsan
+[root@A lisi]# cd ~tom             #去往tom的家目录
+[root@A tom]# pwd
+
+[root@A tom]# cd ~zhangsan     #去往zhangsan的家目录
+[root@A zhangsan]# pwd
+
+ls 列出文档及属性
+• ls — List
+– 格式:ls [选项]... [目录或文件名]
+
+• 常用命令选项
+ – -l:以长格式显示
+ – -A:包括名称以 . 开头的隐藏文档
+ – -d:显示目录本身(而不是内容)的属性
+ – -h:提供易读的容量单位(K、M等)
+
+[root@A ~]# ls -l   /boot/vmlinuz-3.10.0-693.el7.x86_64 
+[root@A ~]# ls -lh  /boot/vmlinuz-3.10.0-693.el7.x86_64
+[root@A ~]# ls -l   /root/
+[root@A ~]# ls -ld  /root/
+
+[root@A ~]# ls   /root/
+[root@A ~]# ls  -A  /root/
+
+[root@A ~]# touch  /root/.nsd.txt
+[root@A ~]# ls  /root/
+[root@A ~]# ls  -A  /root/
+
+#####################################################
+使用通配符
+• 针对不确定的文档名称,以特殊字符表示
+ – *:任意多个任意字符
+ – ?:单个字符
+
+[root@A ~]# ls  /boot/vm*    #匹配以vm开头
+[root@A ~]# ls  /dev/tty*    #匹配以tty开头
+[root@A ~]# ls  /etc/*tab    #匹配以tab结尾
+[root@A ~]# ls  /etc/*.conf   #匹配以.conf结尾
+[root@A ~]# ls  /etc/re*.conf #匹配以re开头并且以.conf结尾
+
+[root@A ~]# ls  /dev/tty?   
+[root@A ~]# ls  /dev/tty??
+[root@A ~]# ls  /dev/tty???
+• 针对不确定的文档名称,以特殊字符表示
+– [a-z]:多个字符或连续范围中的一个,若无则忽略
+– {a,min,xy}:多组不同的字符串,全匹配
+
+[root@A ~]# ls /dev/tty[1-3]
+[root@A ~]# ls /dev/tty[7-8]
+[root@A ~]# ls /dev/tty[1-9]
+
+[root@A ~]# ls /dev/tty{1,3,5,7,9,13}
+[root@A ~]# ls /dev/tty{S0,S1,S2,S3}
+
+####################################################
+别名的定义:简化复杂较长的命令
+
+• 查看已设置的别名
+– alias [别名名称]
+• 定义新的别名
+– alias 别名名称= '实际执行的命令行'
+• 取消已设置的别名
+– unalias [别名名称]
+
+[root@A /]# hn
+bash: hn: 未找到命令...
+[root@A ~]# alias  hn='hostname'   #定义别名hn
+[root@A ~]# hn
+[root@A /]# alias        #查看当前生效的别名
+
+[root@A /]# unalias hn   #删除hn别名
+[root@A /]# hn
+bash: hn: 未找到命令...
+[root@A /]# alias 
+
+[root@A ~]# alias  myls='ls -lh' 
+[root@A ~]# myls /root
+[root@A ~]# myls /boot
+
+####################################################
+制作别名qstat
+ --执行qstat可以运行 /bin/ps -Ao pid,tt,user,fname,rsz
+
+]# alias  qstat='/bin/ps -Ao pid,tt,user,fname,rsz'
+]# qstat
+
+####################################################
+
+mkdir 创建目录
+• mkdir — Make Directory
+– 格式:mkdir [-p] [/路径/]目录名...
+
+]# mkdir -p  /vod/movie/cartoon   #-p表示连父目录一起创建
+]# ls -R /vod/     #递归显示
+
+]# mkdir /opt/nsd01
+]# ls /opt/
+
+]# mkdir -p  /opt/aa/bb/cc/dd   #-p表示连父目录一起创建
+]# ls /opt/
+
+]# ls -R /opt/aa    #递归显示
+
+######################################################
+rm 删除
+• rm — Remove
+– 格式:rm [选项]... 文件或目录...
+
+• 常用命令选项
+– -r、-f:递归删除(含目录)、强制删除
+
+[root@A /]# mkdir /opt/abc01
+[root@A /]# mkdir /opt/abc02
+[root@A /]# touch /opt/1.txt
+[root@A /]# ls /opt/
+1.txt  abc01  abc02
+[root@A /]# rm -rf /opt/abc*
+[root@A /]# ls /opt/
+1.txt
+[root@A /]# rm -rf /opt/1.txt 
+[root@A /]# ls /opt/
+
+
+###############################################
+mv 移动/改名
+• mv — Move
+– 格式:mv [选项]... 原文件...    目标路径
+
+[root@A /]# rm -rf /opt/*
+[root@A /]# ls /opt/
+[root@A /]# mkdir /opt/nsd
+[root@A /]# touch /opt/1.txt
+[root@A /]# ls /opt/
+1.txt  nsd
+[root@A /]# mv /opt/1.txt /opt/nsd/
+[root@A /]# ls /opt/
+nsd
+[root@A /]# ls /opt/nsd/
+
+重命名:路径不变的移动
+[root@A /]# ls /opt/
+nsd
+[root@A /]# mv /opt/nsd/  /opt/abc
+[root@A /]# ls /opt/
+
+[root@A /]# mv /opt/abc/  /opt/student
+[root@A /]# ls /opt/
+
+[root@A /]# mv /opt/student  /opt/haha
+[root@A /]# ls /opt/
+
+###############################################
+cp 复制
+• cp — Copy
+– 格式:cp [选项]... 原文件...     目标路径
+
+• 常用命令选项
+– -r:递归,复制目录时必须有此选项           
+
+[root@A /]# ls /mnt/
+nsd03
+[root@A /]# cp /etc/passwd  /mnt/
+[root@A /]# ls /mnt/
+[root@A /]# cp /etc/redhat-release  /mnt/
+[root@A /]# ls /mnt/
+
+[root@A /]# cp -r /home/  /mnt
+[root@A /]# ls /mnt
+[root@A /]# cp -r /boot/ /mnt/
+[root@A /]# ls /mnt/
+
+复制时出现同名重复,取消提示
+在本次操作临时取消别名
+[root@A /]# cp -r /boot/ /mnt/ 
+
+             按Ctrl + c 结束
+ 
+[root@A /]# \cp -r /boot/ /mnt/
+
+复制支持两个及以上多个参数:
+      永远认为最后一个参数为目标路径,其他的所有参数都作为源
+[root@A /]# rm -rf /mnt/*
+[root@A /]# ls /mnt/
+[root@A /]# cp -r /etc/passwd /etc/fstab /boot/ /home/ /etc/redhat-release  /mnt/
+[root@A /]# ls /mnt/
+
+复制支持一个点的应用:  .表示当前路径
+[root@A /]# cd /mnt/
+[root@A mnt]# ls
+[root@A mnt]# pwd
+[root@A mnt]# cp /etc/hosts   . 
+[root@A mnt]# ls
+[root@A mnt]# cd /etc/pki/CA
+[root@A CA]# pwd
+[root@A CA]# ls
+[root@A CA]# cp /etc/shells   .
+[root@A CA]# ls
+
+
+复制时,可以重命名目录路径 文档的名称
+[root@A /]# cp /etc/redhat-release  /mnt/abc
+[root@A /]# ls /mnt/
+
+[root@A /]# cat /mnt/abc 
+[root@A /]# cat /etc/redhat-release 
+
+[root@A /]# rm -rf /mnt/*
+[root@A /]# cp -r /home/   /mnt/test  
+             #将home放到mnt下改名为test
+[root@A /]# cp -r /home/   /mnt/test
+             #将home放到/mnt/test目录下
+
+[root@A /]# ls /mnt/
+[root@A /]# ls /mnt/test/
+
+####################################################
+vim文本编辑器:修改文件内容
+
+模式: 命令模式      输入模式(插入模式)      末行模式
+
+[root@server0 ~]# vim  /opt/a.txt    
+
+         i 键
+	命---------------->输入模式(按Esc 键回到命令模式)
+	令
+	模
+	式---------------->末行模式(按Esc 键回到命令模式)
+              : 键
+
+     末行模式   :wq   保存退出
+     末行模式   :q!   不保存退出
+
+
+##################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

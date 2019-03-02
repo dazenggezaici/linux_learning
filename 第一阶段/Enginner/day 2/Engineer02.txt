@@ -1,0 +1,615 @@
+教学环境介绍
+
+  优先开启虚拟机classroom,优先一秒钟即可
+
+真机使用rht-vmctl辅助工具
+• 控制教学用虚拟机
+ – 格式:rht-vmctl  控制指令   虚拟机名     
+ – 常用控制指令:
+]# rht-vmctl  reset  classroom  //先重置资源服务器
+]# rht-vmctl  reset  server     //再重置练习虚拟机
+]# rht-vmctl  reset  desktop    //再重置练习虚拟机
+######################################################
+
+Shell脚本基础
+
+  脚本:可以执行一个文件,运行之后可以实现某种功能
+
+什么是Shell脚本
+• 提前设计可执行语句,用来完成特定任务的文件
+– 解释型程序
+– 顺序、批量执行
+                
+#######################################################
+
+  创建用户dc = shell语言中 useradd  dc
+
+  脚本:把我们学过的命令堆积到一个文件中
+
+案例1:利用shell语言 
+         实现在屏幕命令终端,输出 hello world
+
+[root@server0 ~]# vim  /root/hello.sh
+echo hello  world
+
+[root@server0 ~]# chmod +x /root/hello.sh
+[root@server0 ~]# ls -l /root/hello.sh
+
+[root@server0 ~]# /root/hello.sh    #绝对路径方式运行
+
+
+规范Shell脚本的一般组成
+• #! 环境声明  指定以下代码有那个程序解释
+• # 注释文本
+• 可执行代码
+
+1)输出当前红帽系统的版本信息
+2)输出当前使用的内核版本
+3)输出当前系统的主机名
+
+[root@server0 ~]# vim /root/hello.sh
+#!/bin/bash
+echo hello world
+cat /etc/redhat-release
+uname -r
+hostname
+ifconfig | head -2
+[root@server0 ~]# /root/hello.sh
+
+重定向输出
+       >  : 只收集前面命令正确输出
+       2> : 只收集前面命令错误输出
+       &> : 收集前面命令正确输出与错误输出
+[root@server0 ~]# echo 123 > /opt/1.txt
+[root@server0 ~]# cat /opt/1.txt
+[root@server0 ~]# cat /opt/1.txt /a
+
+[root@server0 ~]# cat /opt/1.txt /a  > /opt/a.txt
+[root@server0 ~]# cat /opt/a.txt
+
+[root@server0 ~]# cat /opt/1.txt /a  2> /opt/a.txt
+[root@server0 ~]# cat /opt/a.txt
+
+[root@server0 ~]# cat /opt/1.txt /a  &> /opt/a.txt
+[root@server0 ~]# cat /opt/a.txt
+
+补充:
+    '  ':取消所有字符特殊意义                         
+[root@server0 ~]# echo  '* ? | &'
+
+   $(  )或  ` `反撇号 :将命令的输出,直接参与下一个命令的执行
+[root@server0 opt]# date +%F
+[root@server0 opt]# cd  /opt
+
+[root@server0 opt]# mkdir mydir-`date +%F`
+[root@server0 opt]# ls
+
+[root@server0 opt]# mkdir nsd-$(date +%F)
+[root@server0 opt]# ls
+
+[root@server0 opt]# mkdir $(hostname)-$(date +%F)
+[root@server0 opt]# ls
+
+####################################################
+案例2:创建用户设置密码
+[root@server0 /]# vim /root/user.sh
+
+ #!/bin/bash
+ useradd nsd02
+ echo 123456 | passwd --stdin nsd02
+
+[root@server0 /]# chmod +x /root/user.sh
+[root@server0 /]# /root/user.sh
+
+    /dev/null:黑洞设备
+
+[root@server0 /]# vim /root/user.sh
+ #!/bin/bash
+ useradd nsd05  &> /dev/null
+ echo '用户nsd05创建成功'
+ echo  123456 |  passwd --stdin nsd05  &> /dev/null
+ echo '用户nsd05密码设置成功'
+
+
+  为了增加脚本的灵活性,适应多变的环境与需求  所以使用 变量
+
+   变量 = 容器   
+
+   作用:以不变的名称,存储可以变化的值        
+   定义:
+      变量名=存储的值
+[root@server0 /]# vim  /root/user.sh
+ #!/bin/bash
+ a=natasha
+ useradd  $a   &>  /dev/null
+ echo 用户$a创建成功
+ echo 123456 |  passwd  --stdin  $a  &>  /dev/null
+ echo 用户$a密码设置成功
+
+[root@server0 /]# /root/user.sh
+[root@server0 /]# b=100
+[root@server0 /]# echo $b
+[root@server0 /]# b=200
+[root@server0 /]# echo $b
+
+
+
+定义/赋值变量
+• 设置变量时的注意事项
+– 等号两边不要有空格
+– 变量名只能由字母/数字/下划线组成,区分大小写
+– 变量名不能以数字开头,不要使用关键字和特殊字符
+
+– 若指定的变量名已存在,相当于为此变量重新赋值
+
+
+– 查看变量值:echo $变量名、echo ${变量名}
+
+[root@server0 /]# a=rhel
+[root@server0 /]# echo  $a
+rhel
+[root@server0 /]# echo  $a7
+
+[root@server0 /]# echo  ${a}7
+rhel7
+[root@server0 /]# 
+
+
+• 根据变量的用途不同区分
+
+  环境变量: 由系统定义且赋值完成,用户直接使用即可
+                变量名一般都大写,用来设置用户/系统环境
+
+   USER=当前登陆系统的用户名
+
+[root@server0 /]# echo $USER
+root
+[root@server0 /]# su - student
+[student@server0 ~]$ echo $USER
+student
+[student@server0 ~]$ exit
+logout
+[root@server0 /]# su - natasha
+[natasha@server0 ~]$ echo $USER
+natasha
+[natasha@server0 ~]$ exit
+logout
+[root@server0 /]# 
+
+
+
+ 位置变量: 由系统定义且赋值完成,用户直接使用即可
+         bash内置,存储执行脚本时提供的命令行参数
+
+• 在执行脚本时提供的命令行参数
+  – 表示为 $n,n为序号
+  – $1、$2、$3、$4、.. .. ${10}、${11}、.. ..
+
+[root@server0 /]# vim /root/user.sh 
+ #!/bin/bash
+ useradd  $1  &> /dev/null
+ echo 用户$1创建成功
+ echo 123456 | passwd --stdin  $1  &> /dev/null
+ echo 用户$1密码设置成功
+
+[root@server0 /]# /root/user.sh  haha
+[root@server0 /]# /root/user.sh  xixi
+[root@server0 /]# /root/user.sh  harry
+
+[root@server0 /]# vim /root/1.sh     
+
+#!/bin/bash
+cat -n $1  |  head -$2
+echo 显示$1文件内容的前$2行
+
+[root@server0 /]# chmod  +x  /root/1.sh
+
+[root@server0 /]# /root/1.sh  /etc/passwd   3
+
+
+
+  预定义变量: 由系统定义且赋值完成,用户直接使用即可
+           bash内置,可直接调用的特殊值,不能直接修改
+
+        $# 执行脚本在命令行,输入参数的个数(求和)
+        $* 执行脚本在命令行,输入所有参数的值
+[root@server0 /]# vim /root/2.sh 
+ #!/bin/bash
+ echo $1
+ echo $2
+ echo $#
+ echo $*
+[root@server0 /]#  /root/2.sh haha xixi hehe lele
+
+[root@server0 /]# vim  /root/3.sh 
+ #!/bin/bash
+ echo  您一共输入$#个参数,分别是$*
+
+[root@server0 /]# /root/3.sh   dc tc dz tz
+
+
+
+
+
+
+
+
+        $?   程序退出后的状态值,0表示正常,其他值异常
+              常用于判断上一条命令是否成功运行
+
+
+  自定义变量: 用户自主设置、修改及使用
+
+#################################################
+条件测试
+
+• 检查文件状态
+	-e:文档存在为真
+	-d:文档存在,且必须为目录才为真
+	-f:文档存在,且必须为文件才为真
+	-r:文档存在,且必须对其具备读取权限才为真
+	-w:文档存在,且必须对其具备写入权限才为真
+	-x:文档存在,且必须对其具备执行权限才为真
+[root@server0 /]# [ -e /etc ]   #判断/etc是否存在
+[root@server0 /]# echo $?
+0
+[root@server0 /]# [ -e /abc ]   #判断/abc是否存在
+[root@server0 /]# echo $?
+1
+[root@server0 /]# [ -f /etc ]   #判断/etc是否存在,是不是文件
+[root@server0 /]# echo $?
+1
+[root@server0 /]# [ -d /etc ]   #判断/etc是否存在,是不是目录
+[root@server0 /]# echo $?
+0
+[root@server0 /]# [ -f /etc/passwd ]
+[root@server0 /]# echo $?
+0
+
+• 比较整数大小
+   -gt:大于
+   -ge:大于等于
+   -eq:等于
+   -ne:不等于
+   -lt:小于
+   -le:小于等于
+[root@server0 /]# [ 1 -eq 1 ]
+[root@server0 /]# echo $?
+0
+[root@server0 /]# [ 1 -gt 1 ]
+[root@server0 /]# echo $?
+1
+[root@server0 /]# [ 1 -ge 1 ]
+[root@server0 /]# echo $?
+0
+[root@server0 /]# [ 1 -lt 10 ]
+[root@server0 /]# echo $?
+0
+[root@server0 /]# 
+
+
+• 字符串比对
+     ==:字符串相等为真                                
+     !=:字符串不相等为真
+[root@server0 /]# [  redhat  ==  student  ]
+[root@server0 /]# echo $?
+1
+[root@server0 /]# [  redhat  ==  redhat ]
+[root@server0 /]# echo  $?
+0
+[root@server0 /]# echo  $USER
+root
+[root@server0 /]# [  $USER  ==  root  ]
+[root@server0 /]# echo $?
+0
+[root@server0 /]# [  redhat  !=  student  ]
+[root@server0 /]# echo $?
+0
+[root@server0 /]# 
+####################################################
+
+if双分支处理
+
+	if  [条件测试];then
+	   命令序列xx
+	else
+	   命令序列yy
+	fi
+
+[root@server0 /]# vim  /root/if01.sh
+#!/bin/bash
+if  [  $1  -eq  2  ];then
+  echo hello
+else
+  echo hi
+fi
+[root@server0 /]# chmod  +x  /root/if01.sh
+[root@server0 /]# /root/if01.sh  2
+[root@server0 /]# /root/if01.sh  3
+[root@server0 /]# /root/if01.sh  4
+
+案例:书写脚本/root/ip.sh
+   利用位置变量实现,命令行传递参数
+   用户在命令行输入IP地址,判断如果本机能够ping通,则输出 可以通信
+   用户在命令行输入IP地址,判断如果本机不能够ping通,则输出 不可以通信
+ 
+  提示:ping命令
+         选项  -c 可以指定ping次数                    
+[root@server0 /]# vim  /root/ip.sh 
+ #!/bin/bash
+ ping -c  2   $1  &>  /dev/null
+ if  [  $?  -eq  0  ];then
+  echo  $1可以通信
+ else
+  echo  $1不可以通信 
+ fi
+[root@server0 /]# chmod +x /root/ip.sh  
+[root@server0 /]# /root/ip.sh 172.25.0.11
+[root@server0 /]# /root/ip.sh 192.168.1.1
+
+if多分支处理
+
+	if  [条件测试1];then
+	   命令序列xx
+	elif  [条件测试2];then
+	   命令序列yy
+	elif  [条件测试3];then
+	   命令序列aa
+        ........
+	else
+	   命令序列zz
+	fi
+
+案例:书写脚本/root/num.sh
+       利用位置变量实现,命令行传递参数
+       用户输入考试成绩
+       如果考试成绩大于等于90,则输出  优秀
+       如果考试成绩大于等于80,则输出  良好
+       如果考试成绩大于等于70,则输出  一般
+       如果考试成绩大于等于60,则输出  合格
+       以上条件均不满足: 则输出  一首凉凉送给你
+
+[root@server0 /]# vim  /root/num.sh 
+ #!/bin/bash
+ if   [  $1 -ge 90 ];then
+    echo 优秀
+ elif  [ $1 -ge 80 ];then
+    echo 良好
+ elif  [ $1 -ge 70 ];then
+    echo 一般
+ elif  [  $1 -ge 60 ];then
+    echo 合格
+ else
+   echo  一首凉凉送给你
+ fi 
+[root@server0 /]#   /root/num.sh  90
+[root@server0 /]#   /root/num.sh  87
+
+###################################################
+for循环结构
+
+
+for循环处理
+• 遍历/列表式循环
+– 根据变量的不同取值,重复执行xx处理
+
+	for 变量名 in 值列表
+	do
+	    命令序列
+	done
+
+
+    for  献血车   in  队伍:zhangsan  lisi  wangwu  dc  harry
+    do
+	      抽血
+    done
+
+[root@server0 /]# vim /root/for01.sh
+ #!/bin/bash
+ for  a  in  zhangsan  lisi  wangwu  dc  harry
+ do 
+  useradd $a &> /dev/null
+  echo $a创建成功
+ done
+[root@server0 /]# 
+
+  造数工具:可以制造连续范围的数字
+               {起始点..结束点}
+    
+   制造1-50之间的数字 :  {1..50}
+
+[root@server0 /]# vim  /root/for02.sh
+ #!/bin/bash
+ for  a  in  {1..10}
+ do
+  echo hello  world
+ done
+
+[root@server0 /]# /root/for02.sh
+
+##################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

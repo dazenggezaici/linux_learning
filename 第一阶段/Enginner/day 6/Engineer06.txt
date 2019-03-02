@@ -1,0 +1,521 @@
+教学环境介绍
+
+  优先开启虚拟机classroom,优先一秒钟即可
+
+真机使用rht-vmctl辅助工具
+• 控制教学用虚拟机
+ – 格式:rht-vmctl  控制指令   虚拟机名     
+ – 常用控制指令:
+]# rht-vmctl  reset  classroom  //先重置资源服务器
+]# rht-vmctl  reset  server     //再重置练习虚拟机
+]# rht-vmctl  reset  desktop    //再重置练习虚拟机
+
+######################################################
+环境准备:设置防火墙区域为trusted
+虚拟机Server
+[root@server0 ~]# firewall-cmd --set-default-zone=trusted 
+
+虚拟机Desktop
+[root@desktop0 ~]# firewall-cmd --set-default-zone=trusted 
+
+#######################################################
+
+HTTP服务基础
+
+Web通信基本概念
+• 基于 B/S (Browser/Server)架构的网页服务
+– 服务端提供网页
+– 浏览器下载并显示网页
+
+• Hyper Text Markup Language(html),超文本标记语言
+• Hyper Text Transfer Protocol(http),超文本传输协议  80端口
+
+
+• 软件包:httpd
+• 系统服务:httpd
+• 提供的默认配置
+– Listen:监听地址:端口(80)
+– ServerName:本站点注册的DNS名称(空缺)
+– DocumentRoot:网页文件的根目录(/var/www/html)
+– DirectoryIndex:起始页/首页文件名(index.html
+
+
+搭建基本的Web
+虚拟机Server:
+1.安装httpd软件
+[root@server0 ~]# yum -y install httpd
+
+2.重起httpd服务
+[root@server0 ~]# systemctl restart  httpd
+[root@server0 ~]# systemctl enable  httpd
+
+3.书写一个页面文件
+]# echo '<h1>My First Web' > /var/www/html/index.html
+]# cat /var/www/html/index.html
+<h1>My First Web
+
+虚拟机Desktop:
+]# firefox 172.25.0.11
+
+######################################################
+– DocumentRoot:网页文件的根目录(默认:/var/www/html)
+                                         根目录=起始点
+
+修改存放网页文件的路径为 /var/www/myweb     
+虚拟机Server0:
+1.修改配置文件/etc/httpd/conf/httpd.conf 
+  DocumentRoot /var/www/myweb
+
+2.重起httpd服务
+[root@server0 ~]# systemctl restart httpd
+Job for httpd.service failed. See 'systemctl status httpd.service' and 'journalctl -xn' for details.
+3.建立存放网页文件路径,书写新的页面文件用于测试
+]# mkdir /var/www/myweb
+]# echo '<h1>wo shi myweb' > /var/www/myweb/index.html
+]# cat /var/www/myweb/index.html
+<h1>wo shi myweb
+]# systemctl restart httpd
+虚拟机Desktop:
+]# firefox 172.25.0.11                   
+
+###################################################
+网络路径与实际路径对照
+
+客户端: firefox http://172.25.0.11:80 ---> 服务端  httpd---->DocumentRoot /var/www/myweb----> /var/www/myweb
+
+客户端: firefox 172.25.0.11
+服务端: /var/www/myweb
+
+客户端: firefox 172.25.0.11/var/www/myweb/abc
+服务端: /var/www/myweb/var/www/myweb/abc
+
+虚拟机Server0:
+[root@server0 ~]# mkdir /var/www/myweb/abc
+[root@server0 ~]# echo '<h1>wo shi abc' > /var/www/myweb/abc/index.html
+[root@server0 ~]# cat /var/www/myweb/abc/index.html
+<h1>wo shi abc
+
+虚拟机Desktop0:
+[root@server0 ~]# firefox 172.25.0.11/abc
+
+#######################################################
+虚拟Web主机
+– 由同一台服务器提供多个不同的Web站点
+
+• 区分方式
+– 基于域名的虚拟主机
+– 基于端口的虚拟主机
+– 基于IP地址的虚拟主机
+
+  解决域名:DNS服务器能够解析的域名    classroom.example.com 
+               server0.example.com
+               www0.example.com
+               webapp0.example.com
+
+• 配置文件路径
+– /etc/httpd/conf/httpd.conf (主配置文件)
+– /etc/httpd/conf.d/*.conf (调用配置文件)
+
+• 为每个虚拟站点添加配置
+ <VirtualHost IP地址:端口>
+     ServerName 此站点的DNS名称
+     DocumentRoot 此站点的网页根目录
+ </VirtualHost>
+
+
+基于域名的构建虚拟Web主机     
+[root@server0 ~]# vim /etc/httpd/conf.d/nsd01.conf
+ <VirtualHost  *:80>         #启用虚拟Web主机功能  *:本机任意IP
+  ServerName www0.example.com   #指定访问域名
+  DocumentRoot /var/www/qq      #指定网页文件存放路径
+ </VirtualHost>
+ <VirtualHost  *:80>                
+  ServerName webapp0.example.com  #指定访问域名
+  DocumentRoot /var/www/baidu     #指定网页文件存放路径
+ </VirtualHost>
+[root@server0 ~]# mkdir /var/www/qq /var/www/baidu
+[root@server0 ~]# echo '<h1>企鹅' > /var/www/qq/index.html
+[root@server0 ~]# echo '<h1>百度' > /var/www/baidu/index.html
+
+[root@server0 ~]# systemctl restart httpd
+
+一旦使用了虚拟Web主机功能,所有的网站都要用虚拟Web主机来呈现
+虚拟机Server0:
+[root@server0 ~]# vim /etc/httpd/conf.d/nsd01.conf
+ <VirtualHost  *:80>
+   ServerName www0.example.com
+   DocumentRoot /var/www/qq
+ </VirtualHost>
+ <VirtualHost  *:80>
+   ServerName webapp0.example.com
+   DocumentRoot /var/www/baidu
+ </VirtualHost>
+ <VirtualHost  *:80>
+   ServerName server0.example.com
+   DocumentRoot  /var/www/myweb
+ </VirtualHost>
+
+[root@server0 ~]# systemctl restart httpd
+##################################################
+Apache网页内容访问
+
+针对于网页文件存放路径进行访问控制
+
+• 使用 <Directory> 配置区段
+– 每个文件夹自动继承其父目录的访问控制
+– 除非针对子目录有明确设置
+ <Directory 目录的绝对路径>
+   Require all denied|granted
+   Require ip IP或网段地址 .. ..
+ </Directory>
+
+ <Directory /var/www/myweb>
+   Require ip 172.25.0.11   #仅允许172.25.0.11访问
+ </Directory>
+
+
+ <Directory /opt>
+   Require all denied   #拒绝所有人访问
+ </Directory>
+ <Directory /opt/abc>
+   Require all granted   #允许所有人访问
+ </Directory>
+
+     不能访问 /opt/bcd 路径下页面
+     能访问 /opt/abc 路径下页面
+##################################################
+案例3:配置网页内容访问
+在 Web 网站 http://server0.example.com 的
+DocumentRoot 目录下创建一个名为 private 的子目录,要求如下:
+
+1.查看网站 http://server0.example.com 的DocumentRoot 
+]# cat /etc/httpd/conf.d/nsd01.conf 
+]# mkdir /var/www/myweb/private
+]# echo '<h1>wo shi private' > /var/www/myweb/private/index.html
+]# cat /var/www/myweb/private/index.html
+
+2.从虚拟机server0 上,任何人都可以浏览 private 的内容,
+但是从其他系统不能访问这个目录的内容
+[root@server0 ~]# vim /etc/httpd/conf/httpd.conf
+[root@server0 ~]# vim /etc/httpd/conf.d/nsd02.conf
+<Directory   /var/www/myweb/private>
+    Require ip 172.25.0.11     #仅允许172.25.0.11访问
+</Directory>
+[root@server0 ~]# systemctl restart httpd
+
+虚拟机Desktop0:访问测试报错
+]# firefox server0.example.com/private
+ Forbidden
+
+ You don't have permission to access /private on this server.
+
+######################################################
+案例4:使用自定Web根目录
+调整 Web 站点 http://server0.example.com 的网页目录,要求如下:
+1)新建目录 /webroot,作为此站点新的网页文件目录
+]# mkdir /webroot
+]# echo  '<h1>wo shi webroot'  >  /webroot/index.html
+]# vim /etc/httpd/conf.d/nsd01.conf        
+ <VirtualHost  *:80>
+  ServerName server0.example.com
+  DocumentRoot /webroot           #修改网页文件存放目录
+ </VirtualHost>
+[root@server0 ~]# vim /etc/httpd/conf.d/nsd02.conf
+ <Directory  /webroot>           #针对于/webroot设置权限
+     Require all granted         #允许所有人访问
+ </Directory>
+[root@server0 ~]# systemctl restart httpd
+2)修改SELinux的安全上下文值(标签)
+[root@server0 ~]# ls -Zd /var/www/   #查看目录安全上下文值
+[root@server0 ~]# ls -Zd /webroot/   #查看目录安全上下文值
+ • 方式1:参照标准目录,重设新目录的属性
+– chcon [-R] --reference=模板目录    新目录
+]# chcon -R  --reference=/var/www   /webroot/
+
+######################################################
+部署动态网站
+
+静态网站的运行
+• 服务端的原始网页 = 浏览器访问到的网页
+– 由Web服务软件处理所有请求
+– 文本(txt/html)、图片(jpg/png)等静态资源
+
+
+动态网站的运行
+• 服务端的原始网页 ≠ 浏览器访问到的网页
+– 由Web服务软件接受请求,动态程序转后端模块处理
+– PHP网页、Python网页、JSP网页......
+
+• 新建一个动态站点(虚拟主机)
+– 站点名称为 webapp0.example.com
+
+1.Python网页的页面文件,下载到webapp0.example.com的DocmentRoot
+]# cat /etc/httpd/conf.d/nsd01.conf 
+]# cd  /var/www/baidu/
+]# wget http://classroom.example.com/pub/materials/webinfo.wsgi
+
+2.方便客户端用户访问动态页面
+   页面跳转:当客户端访问网页时,进行跳转到另一个页面
+
+   当用户在浏览器输入 webapp0.example.com,进行跳转到/var/www/baidu/webinfo.wsgi
+
+Alias  客户端浏览器的网络路径     服务端本机实际路径
+
+[root@server0 baidu]# vim /etc/httpd/conf.d/nsd01.conf   
+<VirtualHost  *:80>
+  ServerName webapp0.example.com
+  DocumentRoot /var/www/baidu
+  Alias  /   /var/www/baidu/webinfo.wsgi
+</VirtualHost>
+[root@server0 baidu]# systemctl  restart httpd
+
+[root@desktop0 ~]# firefox webapp0.example.com
+
+3.安装mod_wsgi软件进行翻译Python页面代码
+[root@server0 /]# yum -y install mod_wsgi
+[root@server0 /]# vim /etc/httpd/conf.d/nsd01.conf 
+<VirtualHost  *:80>
+  ServerName  webapp0.example.com
+  DocumentRoot  /var/www/baidu
+  WsgiScriptAlias  /  /var/www/baidu/webinfo.wsgi
+</VirtualHost>
+[root@server0 /]# systemctl restart httpd
+
+[root@server0 /]# firefox webapp0.example.com
+页面内容:  
+    UNIX时间戳: 自1970-1-1 0:0:0到现在时间经过的秒数
+
+4.此虚拟主机webapp0.example.com 使用的端口8909  
+[root@server0 /]# vim /etc/httpd/conf.d/nsd01.conf
+Listen 8909            #设置httpd需要监听8909
+<VirtualHost  *:8909>  #此虚拟机web主机在8909提供服务
+  ServerName webapp0.example.com
+  DocumentRoot /var/www/baidu
+  WsgiScriptAlias / /var/www/baidu/webinfo.wsgi
+</VirtualHost>
+
+5.SELinux非默认端口的开放
+]# semanage port -l | grep http    #查看开放的端口
+]# semanage port -a -t http_port_t -p tcp 8909  #添加端口
+                 -a:添加   -t:类型   -p:协议
+
+]# systemctl restart httpd
+]# firefox webapp0.example.com:8909
+######################################################
+  默认情况下,端口的优先级最高
+  写在第一个虚拟Web主机优先级最高
+
+######################################################
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

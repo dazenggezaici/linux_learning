@@ -1,0 +1,374 @@
+
+RHCE 核心考点列表
+####################################################
+
+一、安全策略配置 ——
+1. 配置SELinux
+
+考试时要求enforcing，会影响Samba、Web服务
+    解决SELinux对Samba的影响：
+    # setsebool  -P  samba_export_all_rw=on
+    解决SELinux对Web的影响：
+	网页目录尽量放到 /var/www/ 下的子目录
+	# semanage  port  -a  -t  http_port_t  -p tcp  8909
+
+2. 配置SSH访问（+防火墙）【##】
+# vim  /etc/ssh/sshd_config
+DenyUsers  用户名1@客户机地址   用户名2@客户机地址  
+#AllowUsers  用户名1@客户机地址   用户名2@客户机地址  
+
+区域my133t.org ==> 172.34.0.0/24(具体以考试说明为准)
+
+
+3. 自定义用户环境（别名设置）
+  需要在 /etc/bashrc 去设置，
+  alias   别名='实际执行的命令行'
+4.  配置防火墙端口转发
+配置工具 —— 
+  图形的 firewall-config
+  命令行 firewall-cmd
+
+顺便把其他所有题目关于防火墙的需求都解决了
+
+在system1上：
+1）修改默认安全区，允许任何访问。默认安全区设为trusted，
+2）拒绝指定的某个网段访问，将指定网段地址添加到block安全区。
+3）实现端口转发（5423 =》80） 
+# firewall-cmd  --permanent  --zone=trusted
+--add-forward-port=被转发端口设置:协议设置:目标端口设置
+# firewall-cmd  --permanent  --zone=trusted
+--add-forward-port=port=被转发端口:proto=tcp:toport=目标端口
+# firewall-cmd  --permanent  --zone=trusted
+--add-forward-port=port=5423:proto=tcp:toport=80
+
+在system2上：
+1）修改默认安全区，允许任何访问。 默认安全区设为trusted。
+2）拒绝指定的某个网段访问。将指定网段地址添加到block安全区。
+
+
+测试端口转发时，需要从其他机器访问
+http://server0.example.com:5423
+http://server0.example.com
+【测试时不要从本机访问】
+
+二、网络连接配置 ——
+5. 配置链路聚合：将多个连接整合成一个连接，共用一个IP地址。实现热备份、负载均衡等功能。
+
+
+网卡 eth1、eth2 考试时是现成的
+
+添加链路聚合的操作 可以 man  nmcli-examples ==> 查找 /Team1
+链路聚合的runner配置 可以 man  teamd.conf ==> /"runner
+
+尽量复制粘贴不要手写
+为聚合连接配置的IP地址千万不要与eth0在同一个网段
+
+
+6. 配置IPv6地址
+
+# nmcli  con  mod  "连接名"  ipv6.method  manual  ipv6.addresses  "IPv6地址/掩码位数"  
+
+测试工具：
+# ping6  IPv6地址      //不要误写 ping6  IPv6地址/64
+
+常见问题：
+  配了IPv6地址的系统，重起后主机名变为localhost.localdomain
+原因：
+  未固定主机名的系统，如果只有一个非回环IP地址，则自动采用从DNS查到的主机名；如果DNS查不到，或者有多个非回环IP地址，则采用默认主机名localhost.localdomain
+解决办法：
+  为两个主机设置正确的、静态的主机名
+
+三、配置邮件服务器 ——
+7. 配置本地邮件服务 【##】
+标准邮件服务器（qq邮箱）：
+    1）提供电子邮箱（yangguo@qq.com）及存储空间
+    2）为客户端向外发送邮件给其他邮箱（xiaolongnv@163.com）
+    3）接收/投递其他邮箱用户发给本邮箱用户的邮件
+
+零客户邮件服务器（机房内网）： —— nullclient 只发不收
+    1）不提供电子邮箱
+    2）为客户端向外发送邮件给其他邮箱（xiaolongnv@163.com）
+    3）不接收/投递其他邮箱用户发给本服务器的邮件
+
+
+应用场景：
+假设运维工程师的邮件是tedu@163.com  CTO主管boss@qq.com
+存放在IDC数据中心的服务器A ，向外发送报警邮件：
+  收件人：tedu@163.com,boss@qq.com
+  发件人: A
+
+问题：不方便接收邮件、不需要为其他机器发邮件
+解决办法：把服务器A配置成nullclient邮件服务器
+伪装发件人来源（A的地址==>tedu@163.com）
+把邮件中继给另外的一台邮件服务器来处理 
+
+
+考试环境：
+1）把 system1、system2 配置为一台零客户邮件服务器
+2）由考官提供后端的标准邮件服务器
+
+
+!!!! 关键点：两台虚拟机都需要正确配置静态的主机名
+
+练习环境：
+1）把 server0 配置成零客户邮件服务器
+# vim  /etc/postfix/main.cf
+relayhost = [后端邮件服务器的域名]
+inet_interfaces = loopback-only  //监听的端口就是本机，不服务其他主机
+myorigin = 
+mynetworks = 127.0.0.0/8  [::1]/128
+mydestination = 哪些邮箱区域/后缀需要安排投递邮件（应该清空）
+local_transport = error:报错信息
+
+（  关于 local_transport = error:报错信息  配置，考试时没要求的话不要写（只是模拟考试需要））
+
+2）使用 desktop0 来模拟后端的标准邮件服务器
+# lab  smtp-nullclient  setup
+
+测试目标 —— 在server0上发一封邮件给本机的student用户，结果会在deskop0上的student用户看到这封邮件
+
+
+
+四、配置文件服务器/客户端 —— 
+8. 通过Samba发布共享目录
+软件包：samba
+配置：/etc/samba/smb.conf
+系统服务：smb
+
+
+#getsebool -a  | grep  samba
+#setsebool  -P samba_export_all_ro=on [永久设置需要加-P  这个过程耗费资源，可能死机]
+
+
+建议在客户端使用smbclient测试Samba共享资源
+# smbclient  -L  服务器地址
+# smbclient  -U  用户名  //服务器地址/共享名
+  ls 如果能看到结果 说明 有读取权限
+  mkdir  mulu1 如果能成功 说明有写入权限
+
+
+
+9. 配置多用户Samba挂载
+软件包：samba-client、cifs-utils
+配置：/etc/fstab
+
+-管理员只需要挂载一次
+-客户端在访问挂载点时，若需要不同权限，可以临时切换为新的共享用户（无需重新挂载）
+实现方式
+-挂载SMB共享时，启用multiuser支持
+-使用cifscreds临时切换身份
+multiuser 提供对客户端多个用户身份的区分支持
+sec=ntlmssp 提供NT局域网管理安全支持
+
+客户端挂载参数：
+username=用户名,password=密码,multiuser,sec=ntlmssp,_netdev
+
+多用户访问测试，不能用root直接测：
+# su  -  普通用户
+$ cifscreds  add  -u  共享用户名  服务器地址
+Password:共享用户的密码
+$ 访问挂载点
+
+所有涉及到开机自动挂载的操作，
+建议先编写/etc/fstab文件，再执行 mount  -a来检查
+
+
+10. 配置NFS共享服务 【##】
+11. 挂载NFS共享 【##】
+
+简单NFS共享服务端的配置 ——
+软件包：nfs-utils
+配置文件：/etc/exports
+文件夹的绝对路径    客户机地址(ro)
+系统服务：nfs-server
+
+简单NFS共享客户端的使用 ——
+# vim  /etc/fstab
+服务器地址:NFS共享目录的绝对路径  挂载点  nfs _netdev  0  0
+# mount  -a
+
+LDAP+LDAP
+
+
+提前准备LDAP+kerberos认证环境：
+LDAP服务器提供用户名（比如 ldapuser0、krishna）
+kerberos服务器提供密码验证（比如密码 kerberos）
+
+kerberos认证的好处（通行证）：
+在管理同一个范围（认证领域）内的多台服务器时，只需要验证一次==》一次验证 多次免密码登录
+
+配置kerberos：在两台虚拟机上执行以下操作（正式考试不需要）：
+# lab  nfskrb5  setup
+krishna是一个LDAP/kerberos网络账号，相当于ldapuser0用户
+
+
+安全NFS共享服务端的配置 ——
+软件包：nfs-utils
+1）配置文件：/etc/exports
+文件夹的绝对路径    客户机地址(rw,sec=krb5p)
+2）为服务器本机部署kerberos加密密钥到 /etc/krb5.keytab
+3）系统服务：nfs-server、nfs-secure-server
+
+安全NFS共享客户端的使用 ——
+1）为客户机本机部署kerberos加密密钥到 /etc/krb5.keytab
+2）# vim  /etc/fstab
+服务器地址:NFS共享目录的绝对路径  挂载点  nfs sec=krb5p,_netdev  0  0
+3）系统服务：nfs-secure
+4）挂载安全NFS共享
+# mount  -a
+
+验证方法：
+# ssh  ldapuser0@desktop0
+$ touch  /mnt/nfssecure/project/a.txt
+
+
+有可能出现NFSv4版本要求——
+在system1服务端：
+# vim  /etc/sysconfig/nfs
+RPCNFSDARGS="-V  4" 			【注意是大写字母  -V】
+
+在system2客户端：
+挂载参数添加 v4 				【注意是小写字母 v】
+
+常见的一些问题：
+1）No route to host ==》对方的防火墙拒绝
+2）RPC: Program not registered ==》对方的NFS服务没开
+3）mount  -a时 incorrect option ==》客户端nfssecure没开
+4）mount  -a时没响应 ==》NFS服务端联系不上（重起）
+5）mount  -a时提示 access  denied ==》权限不够
+	a. 服务端的 exports 授权的地址有误
+	b. 服务端或客户端密钥有问题（文件名或内容有错误）
+	c. 密钥文件过期（classroom太久没重置）
+	d. 忘记执行lab。。。操作
+
+检查密钥文件是否符合：
+# klist  -k  /etc/krb5.keytab
+# less  /var/log/messages
+
+
+19. 配置iSCSI服务端 【##】
+用途：通过网络提供网络磁盘（target === 磁盘柜（包含多块逻辑磁盘））
+软件包：targetcli
+配置工具：targetcli
+系统服务：target
+
+提供的target的IQN名称？（题目提供）
+
+
+
+20. 配置iSCSI客户端 【##】
+用途：通过网络访问网络磁盘（发现、连接）
+软件包：iscsi-initiator-utils
+配置工具：iscsiadm
+系统服务：iscsi(开机时加载iSCSI磁盘配置)、iscsid（修改IQN名之后起一次，更新客户端的IQN名称）
+
+客户机的IQN名称？（自己拟定，可以参考iSCSI磁盘名做一些改变）
+客户端在对连接的iSCSI磁盘分区/格式化操作时，千万看仔细不要格式化错了
+
+iSCSI客户端在RHEL7.0环境下有个小bug，
+导致的问题 reboot 时会死机
+解决办法：
+改用 sync;reboot  -f 代替 reboot
+# vim  /etc/bashrc
+alias  reboot='sync;reboot  -f'
+# sync;reboot
+
+
+关于客户机上 Samba/NFS/iSCSI 资源的挂载问题
+现象：客户机重起以后部分资源没有挂载成功，需要手动执行 mount  -a才能挂上
+原因：服务器准备这些资源需要一段时间，在客户机开机时还没准备完毕，导致挂载不成功
+解决办法：
+# chmod  +x  /etc/rc.d/rc.local
+# vim  /etc/rc.d/rc.local
+.. ..
+for  i  in  {1..5}
+do
+    mount  -a
+    sleep  3
+done
+
+
+
+五、配置网站服务器 ——
+12.实现一个web服务器
+13.配置安全web服务
+14.配置虚拟主机
+15.配置web内容的访问
+16.实现动态WEB内容
+
+建议为每一个虚拟站点准备独立的配置文件，
+默认站点的配置文件名最好以00开台
+httpd  -t 检查语法
+
+动态网站这个，别忘了 Listen 8909
+测试访问动态网站时 http://域名:8909/  要写对
+
+
+获取配置帮助：
+# yum  -y  install  httpd-manual
+# systemctl  restart  httpd
+# 浏览器访问  http://server0.example.com/manual
+
+# rpm  -ql  mod_wsgi
+.. ..  README
+# vim  .. .. README ==》查找 WSGIS 
+
+
+六、Shell脚本编程 —— 
+17. 创建一个脚本
+18. 创建一个添加用户的脚本
+  脚本的文件名和路径不要写错
+  foo.sh 不要写成foo
+  batchusers 不要写成 batchusers.sh
+
+七、配置及管理数据库 ——
+21. 配置一个数据库
+22. 数据库查询（填空）
+别忘记提交查询结果。
+
+firstname  lastname
+李               佳宇
+lastname   
+佳宇
+
+数据库名、用户名不要写错（区分大小写）
+删除空密码的root用户时，千万要提前为root用户设好密码
+必要时重建数据库系统 ——
+# systemctl  stop  mariadb
+# rm  -rf  /var/lib/mysql/
+# yum  -y  reinstall  mariadb-server
+# systemctl  restart  mariadb 
+
+
+RHCE部分 ——
+答题顺序：
+1）看考试说明（提供地址、用户、软件资源、注意事项、用户密码、网段地址）
+2）整体浏览所有考试题
+3）两台虚拟机的root密码是预先告知的，不需要重设
+4）两台虚拟机的主机名需要手动配置正确
+5）两台虚拟机的IP地址参数是通过DHCP分配的，可以不用改
+6）先做高风险题（防火墙、Samba、安全NFS、iSCSI）
+7）再答其他题目
+
+交卷处理：
+1）先把虚拟机2、虚拟机1关机
+2）再重新开启虚拟机1，等60秒左右再开虚拟机2
+3）检查所有答题结果
+4）告知考官交卷
+
+##############################################
+
+关于模拟考试：
+访问 http://localhost/exam/
+  EX200 ==》RHCSA部分
+  EX300 ==》RHCE部分
+
+RHCSA部分争取90分钟内做完、做对
+RHCE部分争取150分钟内做完、做对（>=90%）
+
+
+[root@room9pc13 ~]# rht-labcheck
+.. ..
+Lab-Check finished, 
+your pass-rate is 8.10%，except skiped item.
+

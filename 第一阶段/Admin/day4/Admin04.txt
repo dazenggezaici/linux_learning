@@ -1,0 +1,425 @@
+教学环境介绍
+
+
+预装虚拟机说明
+• 每个学员机上有三台预先配置好的虚拟机
+– server —— 作为练习用服务器
+– desktop —— 作为练习用客户机
+– classroom —— 提供 dhcp分配IP地址/网关/DNS/软件素材等资源
+
+  优先开启虚拟机classroom,优先一秒钟即可
+
+真机使用rht-vmctl辅助工具
+• 控制教学用虚拟机
+ – 格式:rht-vmctl  控制指令   虚拟机名     
+ – 常用控制指令:
+]# rht-vmctl  reset  classroom  //先重置资源服务器
+]# rht-vmctl  reset  server     //再重置练习虚拟机
+]# rht-vmctl  reset  desktop    //再重置练习虚拟机
+
+
+##################################################
+虚拟机Server:管理员的密码为 redhat  
+   1.查看系统版本: RHEL7.0
+   2.查看主机名:server0.example.com
+   3.查看eth0的IP地址: 172.25.0.11/24
+
+虚拟机Desktop:管理员的密码为 redhat
+   1.查看系统版本: RHEL7.0
+   2.查看主机名:desktop0.example.com
+   3.查看eth0的IP地址: 172.25.0.10/24
+
+##################################################
+利用真机进行远程管理两台虚拟机 
+一 真机可以ping通
+[root@room9pc01 ~]# ping 172.25.0.11
+[root@room9pc01 ~]# ping 172.25.0.10
+
+二 进行远程管理
+    补充快捷键  Ctrl +  shift  + t  快速开启一个新的终端
+
+[root@room9pc01 ~]# ssh 用户名@对方的IP地址
+[root@room9pc01 ~]# ssh root@172.25.0.11
+Last login: Thu Jan  3 09:27:40 2019
+[root@server0 ~]# hostname
+server0.example.com
+[root@server0 ~]# ifconfig 
+[root@server0 ~]# exit
+登出
+Connection to 172.25.0.11 closed.
+[root@room9pc01 ~]# 
+
+  -X(大写):在远程管理时,可以运行对方的图形程序
+
+[root@server0 ~]# exit
+登出
+Connection to 172.25.0.11 closed.
+[root@room9pc01 ~]# ssh -X root@172.25.0.11
+
+[root@server0 ~]# firewall-config   #防火墙图形程序
+
+[root@server0 ~]# firefox       #火狐浏览器
+
+三  为真机设置永久别名    
+
+ 永久别名配置:/root/.bashrc  #开启一个新的终端才会生效
+
+[root@room9pc01 ~]# vim /root/.bashrc 
+[root@room9pc01 ~]# head -3 /root/.bashrc
+# .bashrc
+alias  gos='ssh  -X  root@172.25.0.11'
+alias  god='ssh  -X  root@172.25.0.10'
+
+
+#####################################################
+
+零散软件管理
+
+一  从虚拟机classroom获得软件包
+     虚拟机classroom已经搭建Web服务,共享RHEL7.0光盘所有内容
+ 
+1.虚拟机server进行访问:
+[root@server0 ~]# firefox classroom.example.com
+
+http://classroom.example.com/content/rhel7.0/x86_64/dvd/
+
+2.将软件包进行下载
+• 使用wget下载工具
+– wget 软件包的URL网址
+– wget 软件包的URL网址  -O(大写)  /目录路径/新文件名
+ 利用真机的浏览器打开:classroom.example.com 
+ 按 ctrl + f 当前网页查找vsftpd  右击复制链接地址
+
+[root@server0 ~]# wget http://classroom.example.com/content/rhel7.0/x86_64/dvd/Packages/vsftpd-3.0.2-9.el7.x86_64.rpm
+
+[root@server0 ~]# ls
+
+3.安装软件包
+• RPM Package Manager,RPM包管理器
+– rpm -q   软件名...     #查询软件是否安装
+– rpm -ivh 软件名-版本信息.rpm...   #安装软件包
+– rpm -e   软件名...     #卸载软件包
+
+[root@server0 ~]# rpm -q vsftpd
+未安装软件包 vsftpd 
+[root@server0 ~]# rpm -q firefox
+firefox-24.5.0-1.el7.x86_64
+[root@server0 ~]# rpm -q bash
+bash-4.2.45-5.el7.x86_64
+[root@server0 ~]# rpm -q zip
+zip-3.0-10.el7.x86_64
+[root@server0 ~]# rpm -q httpd
+未安装软件包 httpd 
+[root@server0 ~]# rpm -q haha
+未安装软件包 haha 
+[root@server0 ~]# rpm -q hostname
+hostname-3.13-3.el7.x86_64
+#####################################################
+[root@server0 ~]# rpm -q vsftpd   #查询软件包是否安装
+未安装软件包 vsftpd 
+[root@server0 ~]# rpm -ivh vsftpd-3.0.2-9.el7.x86_64.rpm 
+警告：vsftpd-3.0.2-9.el7.x86_64.rpm: 头V3 RSA/SHA256 Signature, 密钥 ID fd431d51: NOKEY
+准备中...                                            ################################# [100%]
+正在升级/安装...
+   1:vsftpd-3.0.2-9.el7                              ################################# [100%]
+[root@server0 ~]# rpm -ql vsftpd  #查询安装的清单
+[root@server0 ~]# rpm -q  vsftpd   
+vsftpd-3.0.2-9.el7.x86_64
+[root@server0 ~]# rpm -e  vsftpd   #卸载软件程序
+[root@server0 ~]# rpm -q  vsftpd
+
+#######################################################
+了解:导入红帽签名信息
+[root@server0 ~]# wget http://classroom.example.com/content/rhel7.0/x86_64/dvd/RPM-GPG-KEY-redhat-release
+
+[root@server0 ~]# ls
+[root@server0 ~]# rpm --import RPM-GPG-KEY-redhat-release 
+[root@server0 ~]# rpm -ivh vsftpd-3.0.2-9.el7.x86_64.rpm 
+准备中...                                            ################################# [100%]
+正在升级/安装...
+   1:vsftpd-3.0.2-9.el7                              ################################# [100%]
+[root@server0 ~]# rpm -q vsftpd
+vsftpd-3.0.2-9.el7.x86_64
+[root@server0 ~]# 
+######################################################
+
+常见提示信息:
+]# rpm -ivh  bind-chroot-9.9.4-14.el7.x86_64.rpm 
+错误：依赖检测失败：
+	bind = 32:9.9.4-14.el7 被 bind-chroot-32:9.9.4-14.el7.x86_64 需要
+
+####################################################
+Yum软件包仓库
+     
+服务:自动解决依赖关系安装软件包
+
+服务端: 1.众多的软件包  2.仓库数据文件   3.搭建Web服务或FTP服务
+                  两者都在光盘中
+           总结:搭建Web服务或FTP服务,共享光盘所有内容
+           Web服务使用协议:
+             http:超文本传输协议
+             https:安全超文本传输协议
+           FTP服务使用协议:
+             FTP:文件传输协议
+          虚拟机classroom已经构建Web服务,共享光盘所有内容
+
+客户端:虚拟机server指定服务端位置
+                            
+   修改配置文件:/etc/yum.repos.d/*.repo
+   客户端配置文件,错误的文件 会影响正确的配置文件
+[root@server0 ~]# rm -rf /etc/yum.repos.d/*
+[root@server0 ~]# vim  /etc/yum.repos.d/dvd.repo
+ [rhel7]               #仓库标识        
+ name=RHEL7.0          #仓库描述信息
+ baseurl=http://classroom.example.com/content/rhel7.0/x86_64/dvd/            #服务端具体位置
+ enabled=1             #是否启用本文件
+ gpgcheck=0            #是否检测红帽签名信息
+
+[root@server0 ~]# yum repolist   #列出仓库信息
+
+Yum仓库的使用                                           
+1.安装软件包        
+[root@server0 ~]# yum -y install httpd
+
+[root@server0 ~]# yum -y install sssd
+[root@server0 ~]# yum -y install system-config-kickstart 
+[root@server0 ~]# yum -y install gcc
+[root@server0 ~]# yum -y install dhcp
+[root@server0 ~]# yum -y install mariadb-server
+
+2.卸载软件包
+[root@server0 ~]# yum  remove  httpd
+[root@server0 ~]# yum  remove  dhcp
+
+3.清空Yum缓存
+[root@server0 ~]# yum clean all
+
+####################################################
+升级内核
+
+1.下载新的内核软件包
+[root@server0 ~]# wget http://classroom.example.com/content/rhel7.0/x86_64/errata/Packages/kernel-3.10.0-123.1.2.el7.x86_64.rpm
+
+[root@server0 ~]# ls
+
+]# uname -r
+]# rpm -ivh kernel-3.10.0-123.1.2.el7.x86_64.rpm
+]# uname -r
+]# reboot 
+
+[root@room9pc01 ~]# gos
+[root@server0 ~]# uname -r    #查看内核版本
+3.10.0-123.1.2.el7.x86_64
+
+#################################################### 
+配置网络
+   /etc:存放众多的系统配置文件
+   
+一  永久设置主机名
+[root@server0 ~]# vim  /etc/hostname   #永久主机名配置文件
+nsd.tedu.cn
+
+[root@server0 ~]# hostname
+nsd.tedu.cn
+[root@server0 ~]# exit
+登出
+Connection to 172.25.0.11 closed.
+[root@room9pc01 ~]# gos
+Last login: Thu Jan  3 16:21:18 2019 from 172.25.0.250
+[root@nsd ~]# hostname
+nsd.tedu.cn
+
+
+
+
+二   永久配置IP地址  子网掩码  网关地址
+
+网卡配置文件:/etc/sysconfig/network-scripts/ifcfg-eth0
+
+通过命令nmcli进行配置
+
+1.利用nmcli命令,进行查看网卡识别的名称
+[root@nsd ~]# nmcli connection show
+名称         
+System eth0  
+
+2.利用nmcli命令,进行配置
+]# nmcli connection modify 'System eth0'    
+   ipv4.method manual                                   
+   ipv4.addresses '172.25.0.110/24   172.25.0.254'        
+   connection.autoconnect yes
+
+]# nmcli connection  修改   '网卡名称'
+   ipv4.方法   手工配置
+   ipv4.地址   'IP地址/子网掩码    网关地址'
+     每次开机自动启用配置
+
+3.激活配置
+]# nmcli connection up 'S(tab)'           17:20上课
+]# ifconfig 
+
+
+三  DNS服务器地址
+     告知本机解析域名,去寻找那台机器
+
+[root@nsd ~]# vim /etc/resolv.conf  #指定永久DNS服务器
+nameserver  172.25.254.254
+
+[root@nsd ~]# cat /etc/resolv.conf
+
+测试DNS解析的命令
+[root@nsd ~]# nslookup classroom.example.com
+[root@nsd ~]# nslookup desktop0.example.com 
+
+网络参数配置顺序:
+    首先配置主机名,然后配置配置IP地址  子网掩码  网关地址,最后指定永久DNS服务器
+
+查看网关地址命令:
+[root@nsd ~]# route
+    Gateway        
+      172.25.0.254    
+
+#####################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

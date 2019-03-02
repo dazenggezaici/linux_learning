@@ -1,0 +1,62 @@
+memcached:  # rhel系统包自带,有点类似简单的数据库
+	# 重启系统后数据会清空，数据只在内存里
+
+yum -y install memcached
+
+配置文件：
+/usr/lib/systemd/system/memcached.service
+# 众多服务启动时配置文件的路径
+/etc/sysconfig/memcached
+	PORT="11211"  # 端口
+	USER="memcached"  # 使用用户
+	MAXCONN="1024"  # 最大连接数
+	CACHESIZE="64"  # 分配内存大小，默认单位M
+	OPTIONS=""  # 其他选项
+
+在RHEL7系统中，使用ss命令可以替代netstat，功能与选项一样。
+memcached服务器需要用telnet来连接
+安装完后用
+	telnet memcached服务器的IP 对应端口(11211)
+	# 进入交互式界面：
+		set name 0 180 3  # set定义变量，name变量名，0表示不压缩，
+				# 180为缓存时间，3为存储数据字节数量
+		abc  # 上方定义变量后在接着这一行填入变量值,上方定义了3个字节
+			# 下面只能输入3个字节(多和少都不行)，如果输错只能重新定义
+		add name 0 180 10  # add与set类似，但add只能添加，如果变量名存在，
+					# 则无法添加，set可以添加可以替换
+		replace name 0 180 10  # 替换变量，如果变量不存在则报错
+		append name 0 180 3  # 追加3个字符到变量name的末尾
+		delete name  # 删除变量
+		stats  # 查看memcache信息、状态
+		quit  # 退出
+
+案例:
+用Nginx反向代理+PHP+memcache
+memcache用于存储用户的登录信息
+需要安装软件包：php-pecl-memcache
+修改配置：/etc/php-fpm.d/www.conf
+php_value[session.save_handler] = memcache
+# 值需要改为memcache,默认为files
+php_value[session.save_path] = “tcp://192.168.2.5:11211”
+# session存储路径,默认为本地
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

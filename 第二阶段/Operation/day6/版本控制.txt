@@ -1,0 +1,72 @@
+SVN：
+安装Subversion服务：
+yum -y install subversion
+mkdir /var/svn/
+svnadmin create /var/svn/project  # 创建版本仓库,类似于git init
+cd /usr/lib/systemd/system/  # 进入目录
+svn import . file:///var/svn/project/ -m "Init Data"
+  # .代表当前目录(/usr/lib/systemd/system/)的所有，导入到版本库中，-m后面接这次导入的提示信息，这一步相当于git的两步（git add [dir,file];git commit -m "提示信息"）
+
+修改配置文件：/var/svn/project/conf/
+ls /var/svn/project/conf/
+	authz passwd  svnserve.conf  # 从右往左修改
+./svnserve.conf:
+	19行：anon-access = none  # 不允许匿名读数据
+	20行：auth-access = write  # 有效账户可读可写
+	27行：password-db = passwd  # 密码文件名
+	34行：authz-db = authz  # 访问控制文件名
+	# 以上参数前（头）不能有空格且默认都是注释
+./passwd:  # 账户密码
+	tom = 123456  # 写在文件末尾即可，单独为svn的账户秘密
+	harry = 123456  # 格式：user = passwd，这个账户与操作系统账户不对等
+./authz:  # 访问控制
+	格式：
+	[/test]	# 版本库下的test目录
+	tom = rw	# tom用户有读写权限
+	* =		# 其他人都没权限
+	
+	[/]		# 版本库下的所有文档
+	tom = rw	# 默认没其他限制
+	harry = rw	# 自动继承/这条权限
+启动服务：
+	svnserve -d -r /var/svn/project/  # -d是将程序放后台，-r需要共享的目录（版本库）
+	ss -antlp | grep 3690  # 查看服务是否启动，端口为3690
+
+另一台主机：  # 能与SVN服务器通信
+	cd /tmp
+	svn --username harry --password 123456 checkout svn://192.168.2.100 code  # 检出2.100的共享版本库的内容到/tmp/code，code目录会生成，checkout可以简写成co
+进入code目录修改内容：
+	cd ./code/
+	echo "xx" >> xx.xx  # 修改文件内容
+	svn ci -m "此次修改的提示内容"  # ci 提交文件修改
+更新数据：
+	在需要更新的目录下：
+		svn update
+还原到指定版本：
+	svn merge -r6:2    tuned.service  # 把该文件从6版本还原到2版本
+svn [选项]:
+	add  			# 添加文件
+	commit(ci)  	# 提交更新
+	checkout(co)	# 检出代码
+	del(rm)		# 删除文件
+	import		# 导入代码
+	info			# 查看版本信息
+	log			# 查看版本历史
+	update		# 更新
+	diff			# 文件对比
+	cat			# 看最新版本库内的文件内容
+	revert		# 本地还原文件内容，不上传
+
+两人工作：
+	修改同个版本库不同文件，无冲突
+	修改同个文件不同行，第二个提交的人需要先执行svn update才能提交
+	修改同个文件同一行，第二个提交的人会收到冲突信息，无法提交
+
+备份：
+	svnadmin dump ./project > my.bak
+还原：
+	svnadmin load ./project_new < my.bak
+
+
+
+

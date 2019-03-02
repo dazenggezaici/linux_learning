@@ -1,0 +1,44 @@
+识别硬盘：
+
+--lsblk
+--MBR:主分区 扩展分区 逻辑分区
+	最多可以有4个主分区，逻辑分区需要建立在扩展分区之上。
+--fdisk /dev/xxx:改变硬盘xxx分区。
+	会进入一个交互式界面，按照界面提示即可完成分区。
+--mkfs:格式化：
+----mkfs.ext3、mkfs.ext4、mkfs.xfs、mkfs.vfat -F 32 ，例:
+	mkfs.ext4 /dev/vdb1,用blkid /dev/vdb1可以查看是否格式化成功。
+--mount:最后在创建（挂载）一个访问点。
+--df:可以查看硬盘分区的使用情况，选择[-h]可以让显示出的数据易读,一般都是df -h /dev/xxx
+--开机自动挂载：修改/etc/fstab文件，格式如下：
+	设备路径 挂载点 类型 参数 备份标记 检测顺序
+	/dev/vdb1 /mypart1 ext4 defaults 0 0
+	/dev/vdb2 /mypart2 xfs defaults 0 0
+--刷新分区：partprobe，这样就不用重启电脑就可以刷新分区。
+--挂载没挂载的分区：mount -a。
+
+LVM逻辑卷：
+
+作用：1、整合分散空间		2、逻辑卷空间可以扩大
+	总结：将众多的物理卷整合成一个卷组，再将卷组分成多个逻辑卷。
+物理卷：PV
+卷组：VG
+逻辑卷：LV
+命令：
+	scan 扫描
+	create 创建  如,创建卷组systemvg:vgcreate systemvg /dev/vdc[1-2]
+		创建逻辑卷lvcreate -L 16G -n mylv systemvg
+	display 显示  vgdisplay systemvg
+	remove 删除  删除要按顺序，先删逻辑，再删卷组。
+	extend 扩展  逻辑卷的扩展：lvextend -L 18G /dev/systemvg/mylv
+					这里是扩展到18G，如果写+2G的话就是在基础上+2G。
+ 		扩展逻辑分区后还需执行：resize2fs(ext4) /逻辑卷路径,刷新文件系统
+					xfs_growfs(xfs) /逻辑卷路径
+			卷组扩展：vgextend systemvg /dev/vdc3
+	扩展命令：pvs查看物理卷的基本信息，同理，vgs,lvs。
+			卷组规划空间的单位(默认，可以改变)：1PE=4M
+			改变规划空间单位比例：vgchange -s 1M systemvg,
+			  这一条表示的是systemvg卷组的空间单元比例为1PE=1M。
+
+
+

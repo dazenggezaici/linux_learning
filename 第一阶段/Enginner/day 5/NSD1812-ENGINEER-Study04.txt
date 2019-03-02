@@ -1,0 +1,46 @@
+1.将本地用户设置为Samba的共享帐号的命令
+       pdbedit 
+
+2.客户端，进行挂载smb服务共享时，需要安装什么软件？
+       cifs-utils
+
+3.实现开机自动挂载smb服务共享，将172.25.0.11的common共享，开机自动挂载到本机/mnt目录下，验证用户名为harry密码为123，如何书写/etc/fstab文件实现
+
+//172.25.0.11/common  /mnt   cifs  defaults,user=harry,pass=123,_netdev  0 0
+
+4.实现开机自动挂载NFS服务共享，将172.25.0.11的/nsd共享，开机自动挂载到本机/mnt目录下，如何书写/etc/fstab文件实现
+
+  172.25.0.11:/nsd    /mnt   nfs  defaults,_netdev 0 0
+
+5.搭建smb服务，需要安装什么软件？
+       samba
+
+6.配置nfs共享，配置文件在哪里？
+     /etc/exports
+
+7.指定DNS服务器地址配置文件
+     /etc/resolv.conf
+
+8.用户基本信息文件/etc/passwd每个字段意义
+用户名:密码占位符:UID:基本组GID:用户描述信息:家目录:解释器
+
+9.请写出http协议、DNS协议、FTP协议默认端口
+               80、53、21
+
+
+10.yum客户端配置文件放在什么路径下？具体都有哪些字段？
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+

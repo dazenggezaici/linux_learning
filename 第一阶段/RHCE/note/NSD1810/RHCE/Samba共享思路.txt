@@ -1,0 +1,75 @@
+										samba共享思路
+
+一、通过 Samba 发布共享目录
+
+在 server0 通过 SMB 共享/common 目录：
+您的 SMB 服务器必须是 STAFF 工作组的一个成员
+共享名必须为 common
+只有 example.com 域内的客户端可以访问 common 共享
+common 必须是可以浏览的
+用户 harry 必须能够读取共享中的内容，如果需要的话，验证的密码是 migwhisk
+
+在server0上
+
+# yum  -y  install  samba					//安装samba软件包
+# useradd  harry							//创建用户
+# pdbedit  -a  harry 						//将harry设定为samba用户并把samba登入密码设为 migwhisk
+# useradd  kenji							//创建用户
+# pdbedit  -a  kenji 						//密码设为 atenorth
+# useradd  chihiho						//创建用户
+# pdbedit  -a  chihiro 					//密码设为 atenorth
+# pdbedit  -L               				//列出所有的Samba账户
+# mkdir  /common							//创建目录准备作共享（普通）
+# mkdir  /devops							//创建目录准备作共享（多用户挂载）
+# setfacl  -m  u:chihiro:rwx  /devops		//设置chihiro用户对此文档的ACL权限（多用户挂载）
+# vim  /etc/samba/smb.conf  				//配置共享服务
+	workgroup = STAFF 					//【修改原配置】工作组名
+	[common] 							//指定共享名1（普通）
+	path = /common       					//指定对应的文件夹位置
+	[devops] 			 				//指定共享名2（多用户挂载）
+	path = /devops 	 					//指定对应的文件夹2位置（多用户挂载）
+	write list = chihiro   				//哪个用户可以写入（多用户挂载）
+# systemctl  restart  smb   				//启动服务
+
+# setsebool -P samba_export_all_rw=on  		//取消SELinux限制读写（开关）
+# setsebool -P samba_export_all_ro=on  		//取消SELinux限制只读（开关）
+SELinux保护开关（布尔值）：
+getsebool  -a  |  grep  samba
+setsebool  -P  布尔参数=值
+
+
+
+在Desktop0上
+
+先安装samba-client 软件包
+# yum  -y  install  samba-client 			//这个工具可以提供TAB键补起
+# yum  -y  install  cifs-utils  			//安装支持挂载CIFS的软件包
+# mkdir  /mnt/dev  						//创建挂载点
+# vim  /etc/fstab  						//配置开机自动挂载
+
+//server0.example.com/devops  /mnt/dev  cifs username=kenji,password=migwhisk,multiuser,sec=ntlmssp,_netdev  0 0   //新的挂在参数要注意
+
+# mount  -a  					//检查及挂载设备
+
+必要的时候,任何普通用户都可以通过用户 chihiro 来临时获取写的权限
+# su  -  student										//先进入student普通用户
+# cifscreds  add  -u  chihiro  server0.example.com 		//在用普通用户切换至chihiro
+Password:  											//输入共享账号 chihiro 的密码
+# touch  /mnt/dev/a.txt  								//测试写入
+# ls  /mnt/dev/ 										//查看写入结果
+列出服务器 server0 提供了哪些Samba共享资源
+# smbclient  -L  server0.example.com 	  				//无密码，直接确认
+
+以用户 harry 访问名为common的共享，只读						//用harry访问/common
+# smbclient  -U  harry  //server0.example.com/common
+smb:\> ls
+
+以用户 kenji 访问共享 //server0.example.com/devops，只读		//用kenji访问/devops
+# smbclient  -U  kenji  //server0.example.com/devops
+smb:\> ls
+
+以用户 chihiro 访问共享 //server0.example.com/devops，可读写	//用chihiro访问/devops
+# smbclient  -U  chihiro  //server0.example.com/devops
+smb:\> mkdir  nsd1702
+smb:\> ls
+

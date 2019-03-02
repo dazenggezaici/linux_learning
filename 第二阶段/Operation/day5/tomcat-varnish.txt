@@ -1,0 +1,94 @@
+JDK:
+	包含整个JAVA环境
+JRE就是精简版的JDK
+
+
+安装Tomcat(lnmp_soft):
+解压apache-tomcat-8.0.30.tar.gz
+解压出来的文件夹就是apache-tomcat-8.0.30，把文件拷贝到其他地方，不需要安装。
+mv apache-tomcat-8.0.30  ./tomcat
+ls ./tomcat
+bin/                                            //主程序目录
+lib/                                            //库文件目录
+logs/                                          //日志目录  
+temp/                                         //临时目录
+work/                                        //自动编译目录jsp代码转换servlet
+conf/                                        //配置文件目录
+webapps/                                        //页面目录
+
+./tomcat/bin/startup.sh  # 开启服务
+./tomcat/bin/shutdown.sh  # 停止服务
+ss -antlp | grep java  # 查看服务启动状态
+
+默认存放网页位置:
+	./tomcat/webapps/ROOT/  # 网页文件以.jsp结尾
+修改配置文件：
+	./tomcat/conf/server.xml  # 主配置文件
+	<Server>
+	  <Service>
+	    <Connector port=8080 />
+	    <Connector port=8009 />
+	    <Engine name="Catalina" defaultHost="默认访问的域名">
+		    <Host name="域名1" appBase="网站根路径1" unpackWARS="true" autoDeploy="true">
+		    </Host>  # 每个host是一个虚拟主机，unpackWARS是否开启自动解压（WAR包），autoDeploy是否开启自动部署
+		    <Host name="域名2" appBase="网站根路径2" unpackWARS="true" autoDeploy="true">
+			<Context path="" docBase="base" />  # docBase指定网页放在网页根目录下的哪个文件，默认为ROOT
+			<Context path="/test" docBase="/var/www/html/" />  # 当访问http://域名2/test时，给予/var/www/html/下的网页文件
+		    </Host>  # 每个host是一个虚拟主机
+	    </Engine>
+	  </Service>
+	</Server>
+配置https：
+keytool -genkeypair -alias tomcat -keyalg RSA -keystore /usr/local/tomcat/keystore  # 生成密钥对
+修改配置，添加如下
+<Connector port="443" protocol="org.apache.coyote.http11.Http11NioProtocol"
+               maxThreads="150" SSLEnabled="true" scheme="https" secure="true"
+               clientAuth="false" sslProtocol="TLS" keystoreFile="/usr/local/tomcat/keystore" keystorePass="123456" />
+			# keystoreFile定义密钥对位置，keystorePass设置密钥时输入的密码
+
+
+Varnish代理+缓存：
+需要源码安装
+安装依赖包：
+	gcc readline-devel ncurses-devel pcre-devel
+		python-docutils(lnmp_soft)
+为了安全，创建禁止登录用户：
+	useradd -s /sbin/nologin varnish
+解包编译安装：
+	tar -xf ./lnmp_soft/varnish-5.2.1.tar.gz
+	cd ./varnish-5.2.1/
+	./configure
+	make && make install
+	cp etc/example.vcl /usr/local/etc/default.vcl
+		# 把当前目录下的案例配置文件复制到/usr/local/etc/default.vcl
+修改配置：  # 路径：/usr/local/etc/default.vcl
+	修改后台服务器IP
+	...
+	backend default {
+		.host = "后端服务器IP";
+		.port = "后端服务器提供网站的端口";
+	}
+启动服务：
+	varnishd -f /usr/local/etc/default.vcl  # 启动占用80端口
+更新缓存数据：
+	默认自动更新，需要时间
+	手动更新：
+		varnishadm  # 进入管理员交互式界面
+		varnish>ban req.rul ~ .*  # 将缓存全部清除,"ban req.rul ~ .*"命令,返回值为200正常
+
+
+
+//varnishd命令的其他选项说明如下：
+//varnishd –s malloc,128M        定义varnish使用内存作为缓存，空间为128M
+//varnishd –s file,/var/lib/varnish_storage.bin,1G 定义varnish使用文件作为缓存
+//varnishlog       varnish实时查看日志
+//varnishncsa      访问日志（信息少）
+
+
+
+
+
+
+
+
+

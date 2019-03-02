@@ -1,0 +1,145 @@
+批量装机：
+
+	部署DHCP服务器：
+		分配PXE引导设置
+		分配IP/子网掩码/网关/广播地址...
+		一个网络中只能有一台DHCP服务器
+		装包DHCP：yum -y install dhcp
+		服务名：dhcpd
+		配置文件路径：/etc/dhcp/dhcpd.conf
+			配置文件模板路径：/usr/share/doc/dhcp*/dhcpd.conf.example
+				在vim中可以在末行模式下：:r /usr/share/doc/dhcp*/dhcpd.conf.example将该文件内容读取到当前
+				配置文件内容：  # 这里的配置都是对于客户端而言
+				subnet 10.5.5.0 netmask 255.255.255.224 {  # 网络
+				  range 10.5.5.26 10.5.5.30;  # 分配的网络范围
+				  option domain-name-servers ns1.internal.example.org;  # DNS服务器地址
+				  option domain-name "internal.example.org";  # 暂时用不到，需要删除
+				  option routers 10.5.5.1;  # 指定网关
+				  option broadcast-address 10.5.5.31;  # 广播地址，不能指定，需要删除
+				  default-lease-time 600;  # 默认租赁时间，单位是秒（s）
+				  max-lease-time 7200;  # 最大租赁时间
+				}
+		重启dhcpd服务：systemctl restart dhcpd
+
+	预启动执行环境PXE 需要网卡支持，PXE client集成在网卡的启动芯片中
+		服务DHCP：提供IP
+		服务TFTP：提供Boot
+			简单的文件传输协议port：69，不需要账户秘密，只需要能通信就能传文件
+		服务HTTP：提供OS
+
+	构建网络装机服务器
+		修改DHCP服务配置文件：在subnet IP netmask MASK {}选项中添加如下两行
+				next-server 192.168.4.7;  # 下一跳服务器地址
+				filename "pxelinux.0";  # 固定格式，指定网卡引导文件名字
+			说明：文件pexlinux.0，类似于说明书，引导计算机进行网络安装系统，文件来源是需要安装xxx软件自动生成，默认文件名为pxelinux.0
+		搭建TFTP服务，提供众多引导文件
+			安装tftp-server：yum -y install tftp-server
+			重启tftp：systemctl restart tftp
+			设置开机自启：systemctl enable tftp
+			默认共享路径：/var/lib/tftpboot
+			部署pxelinux.0引导文件到/var/lib/tftpboot
+				拓展：查询yum包中xxx文件是由什么包产生的：yum provides xxx文件的路径
+				查询是由哪个包产生pxelinux.0：yum provides */pxelinux.0
+				注：如果不知道该文件是在哪个路径可以用*/文件名的方法来查询
+			部署pxelinux.0：
+				yum provides */pxelinux.0
+					syslinux-4.05-13.el7.x86_64
+				yum -y install syslinux
+				find / -name pxelinux.0 -type f或者rpm -ql syslinux | grep pxelinux.0
+					/usr/share/syslinux/pxelinux.0
+				cp /usr/share/syslinux/pxelinux.0 /var/lib/tftpboot/
+		读取菜单文件/var/lib/tftpboot/pxelinux.cfg/default
+			新建/var/lib/tftpboot/pxelinux.cfg目录和default文件
+			该文件的模板需要到光盘中去找，路径：/mnt/isolinux/isolinux.cfg
+			该目录/mnt/isolinux下是用于存放引导文件的
+			部署读取菜单文件
+				cp /mnt/isolinux/isolinux.cfg /var/lib/tftpboot/pxelinux.cfg/default
+			修改菜单文件权限
+				chmod 774 /var/lib/tftpboot/pxelinux.cfg/default
+			部署 图形模块 与 背景图片，意思是cp到/var/lib/tftpboot/下
+				图形模块路径/mnt/isolinux/vesamenu.c32
+				背景图片路径/mnt/isolinux/splash.png
+			部署 启动内核 与 驱动程序，意思是cp到/var/lib/tftpboot/下
+				启动内核路径/mnt/isolinux/vmlinuz
+				驱动程序路径/mnt/isolinux/initrd.img
+			至此，/var/lib/tftpboot下需要有6个文档
+				ls /var/lib/tftpboot/
+					initrd.img  pxelinux.0  pxelinux.cfg  splash.png  vesamenu.c32  vmlinuz
+				修改菜单文件内容
+				vim /var/lib/tftpboot/pxelinux.cfg/default
+				第11行，修改标题：menu title NSD1812 dazengge's PXE Server !
+				第61-64行：
+				label linux
+					menu label ^Install RHEL7.4  # 这一行的^让^后的字母I成为跳转为该行的快捷键
+					kernel vmlinuz
+					append initrd=initrd.img
+				第65行以下的全部删除，暂时不用
+		测试：
+			新建一台虚拟机，选择“网络引导安装（PXE）”
+			由于在超时60s后仍无操作，需要在菜单文件内容的label选项的menu label下，选项kernel之上添加内容
+				menu default  # 也就是在实验中菜单文件的第62和63行之间插入
+				
+	部署无人值守安装：
+		搭建web服务器，共享光盘所有内容
+			yum -y install httpd
+			systemctl restart httpd
+			systemctl enable httpd
+			mkdir /var/www/html/rhel7/
+			mount /dev/cdrom /var/www/html/rhel7/
+		验证：firefox localhost/rhel7  # 出现光盘内容即为成功
+	
+	生成应答文件：
+		安装一个图形的工具，可以生成应答文件
+			yum -y install system-config-kickstart  # 安装
+			system-config-kickstart  # 启动
+			注意：redhat7在“软件包选择”选项中没有选项，解决方法：
+				需要本地yum仓库的支持，需要仓库标识[development]，而且baseurl还需要是本地光盘路径,配置完本地yum后恢复正常
+			保存应答文件
+			共享应答文件：
+				cp /root/ks.cfg /var/www/html  # 通过http共享该文件
+				最后共享路径为http://共享主机地址/ks.cfg
+				
+	通过菜单文件，指定应答文件的位置：
+		编辑菜单文件：/var/lib/tftpboot/isolinux.cfg/default
+			在label选项中的append选项后添加ks=http://192.168.4.7/ks.cfg，例下：
+				label linux
+				menu label ^Install RHEL7.4
+				menu default
+				kernel vmlinuz
+				append initrd=initrd.img ks=http://192.168.4.7/ks.cfg
+				
+				
+总结：
+	1、部署DHCP并配置好pxelinux.0
+	2、部署tftp服务，并把所需要的文件全部放入共享目录
+	3、修改菜单文件
+	4、部署无人值守安装，就是将光盘文件共享到http上
+	5、生成应答文件
+	6、编写安装完后让客户端yum可用，在应答文件安装后脚本实现
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

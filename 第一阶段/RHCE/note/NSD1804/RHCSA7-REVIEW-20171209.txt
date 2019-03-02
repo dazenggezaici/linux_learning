@@ -1,0 +1,236 @@
+
+vncviewer 172.40.50.113:7000
+
+  曾  晔
+
+
+访问虚拟机的方式：
+建议从真机SSH远程虚拟机
+ssh  -X  root@虚拟机地址
+
+真机：RHEL 7.2/7.3，有图形桌面
+虚拟机：RHEL 7.0，无图形桌面
+
+
+资源获取：
+http://172.40.50.113/rhce/
+
+
+1）答题顺序：先高风险题（内核、分区），再其他容易的题
+2）所有用到的系统服务，别忘了设置开机自起
+# systemctl  enable  sssd  NetworkManager  ....
+3）答题完毕后，先重起一次，检查全部结果，再交卷
+
+﻿
+RHCSA 核心考点列表
+####################################################
+
+一、开考准备 —— 
+1. 重设虚拟机的root密码
+!!!! 修改 linux16 .. .. rd.break  console=tty0
+!!!! 重新挂载 mount  -o  remount,rw  /sysroot
+
+chroot  /sysroot
+touch  /.autorelabel  【不要写成...relable】
+
+
+2. 为虚拟机配置网络
+
+配置主机名：
+# vim  /etc/hostname
+或者
+# hostnamectl  set-hostname  新主机名
+
+列出网卡设备：
+nmcli  device  status
+列出连接：
+nmcli  con  show
+
+添加/删除连接：
+nmcli  con  add  con-name  "连接名"  ifname  网卡名  type  ethernet
+nmcli  con  del "连接名"
+
+配置连接参数：
+nmcli  con  mod  "连接名"  ipv4.method  manual  ipv4.addresses  "IPv4地址/掩码  默认网关"  ipv4.dns  DNS服务器地址  ipv4.dns-search  默认搜索域  connection.autoconnect  yes
+
+!!!! 对RHEL7.2及以上系统，通过 ipv4.gateway 配网关
+
+激活/禁用连接：
+nmcli  con  down  "连接名"
+nmcli  con  up  "连接名"
+
+
+
+二、系统管理任务 ——
+1. 添加YUM源
+# yum-config-manager  --add-repo  软件源网址
+# vim  /etc/yum.conf
+gpgcheck = 0
+
+3. 添加用户/组账号
+11. 配置用户账号
+4. 设置文件权限
+6. 建共用目录（SGID）
+5. 配置计划任务
+分  时  日  月  周  任务命令行
+
+每三天 ——
+0  0  */3  *  *
+
+crond
+
+7. 升级内核
+# wget  内核文件的下载地址
+# rpm  -ivh  内核文件的路径
+.. .. 安装过程中千万不要中断
+
+
+三、文档管理 ——
+13. 查找文件（find）
+14. 检索文本（grep）
+16. 创建归档（tar）
+
+
+四、配置应用客户端 ——
+10. 设置NTP时间同步客户端
+万一chrony已经安装而且有错误配置：
+# rm  -rf  /etc/chrony.conf
+# yum  -y  reinstall  chrony
+
+
+# vim  /etc/chrony.conf
+server  NTP服务器的地址  iburst
+# systemctl  restart  chronyd
+
+8. 设置LDAP客户端
+# yum  -y  install  sssd 
+# authconfig-tui
+.. ..
+提示部署证书时，另开一个终端
+# cd  /etc/openldap/cacerts
+# wget http://classroom.example.com/pub/example-ca.crt
+
+返回 authconfig-tui 界面，选定 OK 确定
+# id  ldapuser0 
+
+
+9. 设置autofs触发挂载+NFS共享客户端
+
+autofs，自动文件系统 【触发】
+作用：
+1）当用户需要访问一个文件系统时，能自动挂载
+2）当用户不需要访问一个文件系统时，能自动卸载
+
+实现思路（/A/B）：
+1. 提前准备文件系统挂载点B的上一层目录A
+2. 请autofs监控A目录，一旦发现有用户或程序需要访问目录B
+，那么立即创建目录B并挂载指定的设备到目录B
+3. 如果目录B挂载的文件系统闲置（默认300秒），那么autofs会卸载已经挂载到目录B的文件系统，并且删除目录B
+
+
+实现步骤：
+1. 装包
+# yum  -y  install  autofs
+2. 配置
+1）建立挂载点父目录A
+# mkdir  -p  /home/guests
+2）告诉autofs监控A目录
+# vim  /etc/auto.master
+被监控目录的路径	监控策略文件的路径
+/home/guests  	/etc/auto.guests
+3）告诉autofs当访问哪个目录时挂载哪个设备
+# vim /etc/auto.guests
+挂载点目录名 	-挂载参数  	服务器地址:设备路径
+ldapuser0 -rw  classroom:/home/guests/ldapuser0
+或者
+*  		  -rw  classroom:/home/guests/&
+3. 起服务
+# systemctl  restart  autofs
+
+
+
+五、磁盘分区及存储 ——
+15. 添加逻辑卷
+# vgcreate -s  PE大小   卷组名   设备路径
+# vgremove  卷组名
+
+# lvcreate  -L  大小  -n  逻辑卷名  卷组名 
+# lvcreate  -l  PE个数  -n  逻辑卷名  卷组名 
+
+2. 扩展逻辑卷
+先检查逻辑卷vo的大小、在哪个卷组？
+# lvscan
+
+扩展卷组空间：
+# vgextend  卷组名  空闲设备路径
+
+扩展逻辑卷：
+# lvextend  -L  新大小  /dev/卷组名/逻辑卷名
+
+文件系统扩容以后如何刷新：
+# blkid  /dev/卷组名/逻辑卷名
+.. .. TYPE="xfs" 			【有可能是ext3/ext4】
+
+如果是 xfs，需要执行：
+# xfs_grow  /dev/卷组名/逻辑卷名
+如果是 ext3/ext4，需要执行：
+# resize2fs  /dev/卷组名/逻辑卷名
+
+检查结果：
+# mount  /dev/卷组名/逻辑卷名  /mnt
+# df  -h  /mnt
+
+
+12. 添加交换分区
+# mkswap  /dev/vdb7
+# vim  /etc/fstab
+/dev/vdb7	swap	swap  defaults,pri=5  0  0
+# swapon  -a
+
+如果有要求指定交换分区的优先级，只需要在挂载参数添加 pri=5
+
+# man  swapon
+==》查找 /-p ，优先级范围 -1～32767，数字越大优先级越高
+
+
+考试环境：
+只有一块磁盘/dev/vda（/boot、卷组（/、……）、剩余空间）
+
+练习环境：
+有一块磁盘/dev/vda（没有剩余空间）
+有一块磁盘/dev/vdb（空磁盘）
+
+使用/dev/vdb模拟成考试环境 
+
+
+分区之前先要明确2个问题：
+1）需要增加几个新的分区？3
+2）新增加的分区各自的大小是多少？500M、1000M、512M
+
+检查磁盘的分区模式：
+# fdisk  -l  /dev/vda
+.. ..
+Disk label type: dos 		【万一有可能是gpt】
+.. ..
+
+根据分区模式不同，选择不同的分区工具。
+如果是dos模式（4个主分区，扩展分区、逻辑分区），那么
+# fdisk  /dev/vda
+.. ..
+将剩余空间全部作为扩展分区：
+—— n、e、回车、回车
+在扩展分区内再划分3个逻辑分区
+—— n、起始位置回车、结束位置（+大小） 。。。。
+
+
+如果是gpt模式（128个主分区），那么
+# gdisk  /dev/vda
+.. ..
+n、分区编号、起始位置、结束位置（+大小）、类型（Enter）
+.. ..
+
+刷新分区表：
+# partprobe /dev/vdb
+# reboot
+
+####################################################

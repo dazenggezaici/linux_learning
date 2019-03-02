@@ -1,0 +1,117 @@
+tcp  可靠  效率较低  面向连接的
+	三次握手  syn---ack,syn---ack
+	四次断开  fin---ack---fin---ack
+
+http  80
+dns   53
+ftp   21
+ssh   22
+https  443
+telnet  23
+smtp   25
+	
+udp  效率高  不可靠  无连接的
+tftp  69
+dns   53
+ntp   123 
+
+acl  访问控制列表
+标准acl   1～99    源ip
+扩展acl   100～199  源ip  目标ip  协议  端口
+
+nat 网络地址转换
+私有地址范围
+A  10.0.0.0～10.255.255.255
+B  172.16.0.0～172.31.255.255
+C  192.168.0.0～192.168.255.255
+静态  服务器发布服务时   1对1
+PAT 仅访问外网时使用    1对多
+
+
+stp  生成树协议  
+防止广播风暴产生，使阻塞接口起到备份链路的作用
+
+
+Switch(config)#spanning-tree vlan 1 priority 28672     //修改生成树优先级为28672
+Switch#show spanning-tree vlan 1  //查看vlan1生成树状态
+
+FWD  转发状态
+BLK  阻塞状态
+
+PVST+  每vlan生成树，可以实现负载均衡
+
+每台三层交换机配置：
+Switch(config)#vlan 2    //创建vlan2
+Switch(config)#interface range fastEthernet 0/1-3
+Switch(config-if-range)#switchport trunk encapsulation dot1q   //打封装
+Switch(config-if-range)#switchport mode trunk   //配置中继链路
+
+MS1   
+vlan1   主根      vlan2   次根
+Switch(config)#spanning-tree vlan 1 priority 24576     //修改生成树优先级为24576（vlan1的主根）
+Switch(config)#spanning-tree vlan 2 root secondary   //指定当前交换机为vlan2的次根
+
+MS2
+vlan1   次根      vlan2   主根
+Switch(config)#spanning-tree vlan 1 priority 28672     //修改生成树优先级为28672（vlan1的次根）
+Switch(config)#spanning-tree vlan 2 root primary    //指定当前交换机为vlan2的主根
+
+路由器
+Router(config)#router ospf 1
+Router(config-router)#network 192.168.4.0 0.0.0.255 area 0
+Router(config-router)#network 192.168.3.0 0.0.0.255 area 0
+Router(config-router)#network 192.168.2.0 0.0.0.255 area 0
+MS1
+Switch(config)#ip routing
+Switch(config)#router ospf 1
+Switch(config-router)#network 192.168.1.0 0.0.0.255 area 0
+Switch(config-router)#network 192.168.2.0 0.0.0.255 area 0
+MS2
+Switch(config)#ip routing
+Switch(config)#router ospf 1
+Switch(config-router)#network 192.168.1.0 0.0.0.255 area 0
+Switch(config-router)#network 192.168.3.0 0.0.0.255 area 0
+
+配置HSRP
+MS1
+Switch(config)#interface vlan 1
+Switch(config-if)#standby 1 ip 192.168.1.254   //开启热备份，组号为1，虚拟路由器ip是192.168.1.254
+
+MS2
+Switch(config)#interface vlan 1
+Switch(config-if)#standby 1 ip 192.168.1.254
+
+占先权  当本机优先级大于其他主机时，立刻成为活跃路由器
+
+Switch(config-if)#standby 1 priority 105   //修改优先级
+Switch(config-if)#standby 1 preempt   //配置占先权
+
+
+
+MS1   
+vlan1  （stp）主根    （hsrp）活跃    vlan2   次根   备份
+
+MS2
+vlan1   次根  备份     vlan2   主根  活跃
+MS1    是vlan1的活跃，vlan2的备份
+Switch(config)#interface vlan 1
+Switch(config-if)#standby 1 ip 192.168.1.254
+Switch(config-if)#standby 1 priority 105
+Switch(config-if)#standby 1 preempt
+
+Switch(config)#interface vlan 2
+Switch(config-if)#standby 2 ip 192.168.2.254
+
+MS2   是vlan1的备份，vlan2的活跃
+Switch(config)#interface vlan 1
+Switch(config-if)#standby 1 ip 192.168.1.254
+
+Switch(config)#interface vlan 2
+Switch(config-if)#standby 2 ip 192.168.2.254
+Switch(config-if)#standby 2 priority 105
+Switch(config-if)#standby 2 preempt
+
+
+
+
+

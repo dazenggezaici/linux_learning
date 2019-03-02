@@ -1,0 +1,50 @@
+Internet
+OSI模型-七层架构
+	物理层			# 地基
+	数据链路层		#
+	网络层			# IP ICMP IGMP ARP RARP
+	传输层			# TCP UDP
+	会话层			#
+	表示层			#
+	应用层			# 可以入住的楼房 HTTP FTP TFTP SMTP SNMP DNS
+	
+单位：
+	bit 比特 由'0'和'1'组成,一堆bit组成比特流  # 物理层
+	数据帧			# 数据链路层
+	数据包			# 网络层
+	数据段			# 传输层
+	
+物理层线材：
+	双绞线UTP
+	带屏蔽的双绞线STP
+	
+	cat5	100Mbps	五类线材
+	cat5e	100Mbps	超五类线
+	cat6	1000Mbps
+	cat7	10000Mbps
+	光纤
+	全反线 console 控制线 初次配置设备时使用
+	如果有连接交换机就用直通线
+cisco：
+	交换机：	
+	enable password  # 配置特权模式的密码
+	write相当于copy running-config startup-config  # 把在内存的配置文件running-config 移动到硬盘中的startup-config文件
+	line console 0  # 配置模式
+		exec-timeout 0 30  # 每隔30s锁屏
+		logging synchronous  # 有提示时不要影响我输入命令
+		
+	路由器：
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		

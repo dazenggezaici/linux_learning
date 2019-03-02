@@ -1,0 +1,127 @@
+mac 硬件地址  物理地址
+长度48位   6字节
+8位（bit）=1字节（byte）
+100Mbit   10+
+前24位 供应商标示，后24位产品编号
+单播 1对1    组播  1对多   广播  1对所有
+
+数据帧
+目标地址   源地址   类型/长度   数据（MTU1500） 校验
+学习  广播  转发  更新
+广播域
+vlan  广播控制   增加安全  带宽利用率提高   延迟减低
+trunk 中继链路   打标记   ieee 802.1q(dot1q)
+以太通道
+
+网络层功能
+连接不同范围的主机 
+
+A 1～127
+255.0.0.0
+B 128～191
+255.255.0.0
+C 192～223
+255.255.255.0
+
+
+192.168.0.1
+255.255.255.0   
+11111111.11111111.11111111.00000000      1的部分是网络位
+									0的部分是主机位
+192.168.0.0    网络ID
+192.168.0.255   广播地址
+									
+									
+192.168.1.2
+255.255.255.0
+网段
+
+路由器配置ip：
+Router(config)#interface gigabitEthernet 0/0   //进入G0/0接口
+Router(config-if)#ip address 192.168.1.254   255.255.255.0	//配置ip地址
+Router(config-if)#no shutdown 	  //打开接口
+
+路由表  标识了当前设备能够到达的网段，以及方向
+
+Router#show ip route    //查看路由表
+
+C 直连路由   产生条件是接口配置ip并且处于开启状态
+S 静态路由   由管理员手工配置，并且设备两端都要相同的配置，否则有去无回，由目标网段（网络ID）+子网掩码+下一跳地址构成
+S* 默认路由  特殊的静态路由，在路由表中可以到达任意地点，其他路由条目无法到达时，将使用默认路由，通常在企业网关设备对外出口使用。
+     动态路由  使用某种动态路由协议实现，可以做到自动学习路由条目，根据网络状态自动变化来达成网络互通的目的
+ 
+宣告  对外通告本设备能够到达的网段
+    
+255.255.255.0
+0.0.0.255
+
+路由环路
+
+ip route 0.0.0.0 0.0.0.0 下一跳
+
+
+第一台路由器
+Router(config)#ip route 192.168.3.0 255.255.255.0 192.168.2.2     //配置前往3.0网段并且出口方向是192.168.2.2的静态路由
+第二台路由器
+Router(config)#ip route 192.168.1.0 255.255.255.0 192.168.2.1  	 //配置前往1.0网段并且出口方向是192.168.2.1的静态路由
+
+Router(config)#interface g0/0   //进入G0/0接口
+Router(config-if)#no ip address    //删除此接口的ip
+
+思路：
+1，考虑所要前往的目标网段
+2，考虑前往的目标网段第一步往哪个ip跳
+3，使用静态路由添加目标网段的网络ID与下一跳
+
+三层交换机基本配置：
+SVI  交换机虚拟接口
+Router(config)#vlan 2
+Router(config)#interface vlan 2    //进入虚拟接口
+Router(config-if)#ip address 192.168.2.254  255.255.255.0 //配置SVI接口地址 
+Router(config)#interface f0/2
+Router(config-if)#switchport access vlan 2  //将接口加入vlan2
+Router(config)#ip routing     //开启路由功能
+
+思路：
+1，添加二层交换机一台，创建vlan2 vlan3
+2，将二层交换机f0/2口加入vlan2，f0/3口加入vlan3
+   f0/24口配置为中继模式
+Switch(config)#in f0/2
+switchport access vlan 2  //将接口加入vlan2
+Switch(config)#in f0/3
+switchport access vlan 3  //将接口加入vlan3
+Switch(config)#in f0/24
+Switch(config-if)#switchport mode trunk	
+3，在三层交换机的f0/24口上封装802.1q协议
+	然后配置为中继模式
+三层交换机配置中继链路，先封装802.1q协议，再配置
+Switch(config)#interface fastEthernet 0/24
+Switch(config-if)#switchport trunk encapsulation dot1q 		  //打封装
+Switch(config-if)#switchport mode trunk		
+
+三层交换机配置：
+Switch(config)#interface fastEthernet 0/23
+Switch(config-if)#no switchport   //将交换机接口转换为路由器接口
+Switch(config-if)#ip address 192.168.4.1 255.255.255.0    //配置ip
+
+配置动态路由：
+三层交换机配置
+Switch(config)#router ospf 1
+Switch(config-router)#network 192.168.1.0 0.0.0.255 area 0
+    //宣告本机所在的直连网段，区域都是0
+Switch(config-router)#network 192.168.2.0 0.0.0.255 area 0
+Switch(config-router)#network 192.168.3.0 0.0.0.255 area 0
+Switch(config-router)#network 192.168.4.0 0.0.0.255 area 0
+路由器配置
+Router(config)#router ospf 1
+Router(config-router)#network 192.168.4.0 0.0.0.255 area 0
+
+
+
+
+
+
+
+
+
+

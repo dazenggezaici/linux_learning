@@ -1,0 +1,185 @@
+教学环境介绍
+
+  优先开启虚拟机classroom,优先一秒钟即可
+
+真机使用rht-vmctl辅助工具
+• 控制教学用虚拟机
+ – 格式:rht-vmctl  控制指令   虚拟机名     
+ – 常用控制指令:
+]# rht-vmctl  reset  classroom  //先重置资源服务器
+]# rht-vmctl  reset  server     //再重置练习虚拟机
+]# rht-vmctl  reset  desktop    //再重置练习虚拟机
+######################################################
+扇区默认512字节
+
+一块硬盘的“艺术”之旅
+• 识别硬盘 => 分区规划 => 格式化 => 挂载使用
+   毛坯楼层 => 打隔断 => 装修 => 入驻
+
+一  识别硬盘
+[root@server0 ~]# lsblk    #列识别的硬盘设备
+NAME   MAJ:MIN RM SIZE RO TYPE MOUNTPOINT
+vda    253:0    0  10G  0 disk 
+└─vda1 253:1    0  10G  0 part /
+vdb    253:16   0  10G  0 disk 
+[root@server0 ~]# ls  /dev/vdb
+
+二  分区规划
+     分区模式:  MBR  GPT
+       MBR: 主分区   扩展分区   逻辑分区 
+                    最多可以有4个主分区,  逻辑分区需要建立在扩展分区之上
+                    最终常用方案  3个主分区  一个扩展分区  n个逻辑分区
+                    最大支持的空间为2TB
+
+            
+• 修改硬盘的分区表
+– fdisk 硬盘设备
+
+[root@server0 ~]# fdisk  /dev/vdb 
+  n 创建新的分区----->回车----->回车---->回车----->在last结束时 +1G
+  p 查看分区表
+  n 创建新的分区----->回车----->回车---->回车----->在last结束时 +2G
+  d 删除分区
+  w 保存并退出    
+
+[root@server0 ~]# lsblk
+[root@server0 ~]# ls  /dev/vdb[1-2]
+
+三  格式化,赋予空间文件系统过程
+     文件系统:存储数据的规则
+     常见文件系统:ext4 xfs
+
+• mkfs 工具集
+– mkfs.ext3 分区设备路径
+– mkfs.ext4 分区设备路径
+– mkfs.xfs 分区设备路径
+– mkfs.vfat -F 32 分区设备路径
+[root@server0 ~]# mkfs.ext4 /dev/vdb1  #格式化ext4文件系统
+[root@server0 ~]# blkid /dev/vdb1      #查看文件系统类型
+
+[root@server0 ~]# mkfs.xfs /dev/vdb2  #格式化xfs文件系统
+[root@server0 ~]# blkid /dev/vdb2     #查看文件系统类型
+
+四  挂载使用
+[root@server0 ~]# mkdir /mypart1            
+[root@server0 ~]# mount /dev/vdb1  /mypart1  
+[root@server0 ~]# df -h     #查看正在挂载设备的使用情况
+
+[root@server0 ~]# mount /dev/vdb2  /mypart2
+[root@server0 ~]# df -h
+
+五  开机自动挂载 /etc/fstab
+
+• 配置文件 /etc/fstab 的记录格式
+   设备路径     挂载点       类型      参数        备份标记      检测顺序
+/dev/vdb1  /mypart1  ext4   defaults   0         0
+/dev/vdb2  /mypart2  xfs    defaults   0         0
+
+vim文本编辑器: 按o  另起新的一行 进入 插入模式
+[root@server0 ~]# vim /etc/fstab 
+
+/dev/vdb1  /mypart1  ext4  defaults  0 0
+/dev/vdb2  /mypart2  xfs   defaults  0 0
+
+[root@server0 ~]# umount /mypart1  #保证当前没有挂载,进行测试
+[root@server0 ~]# umount /mypart2
+[root@server0 ~]# df -h
+
+[root@server0 ~]# mount -a
+   检测/etc/fstab开机自动挂载配置文件,格式是否正确
+   检测/etc/fstab中,书写完成,但当前没有挂载的设备,进行挂载 
+[root@server0 ~]# df -h    #查看自动挂载情况
+#######################################################
+综合分区:
+ 最终有3个主分区，分别为1G、2G、2G
+   创建扩展分区 --->  两个逻辑分区，分别为2G、2G
+[root@server0 ~]# fdisk  /dev/vdb
+   p 查看分区表
+   n 创建主分区----->回车----->回车---->回车----->在last结束时 +2G
+   p 查看分区表
+   n 创建扩展分区 
+          ----->回车---->起始回车----->结束回车   将所有空间给扩展分区
+   p 查看分区表
+   n 创建逻辑分区----->起始回车------>结束+2G
+   n 创建逻辑分区----->起始回车------>结束+2G
+   p 查看分区表
+   w 保存并退出
+[root@server0 ~]# lsblk 
+[root@server0 ~]# partprobe   #刷新  分区表信息 识别新的分区
+[root@server0 ~]# lsblk 
+
+
+
+
+  partprobe  #刷新新的分区
+    
+[root@server0 ~]# ls /dev/vdb[1-6]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

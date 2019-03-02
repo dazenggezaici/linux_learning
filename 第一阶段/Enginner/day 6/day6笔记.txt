@@ -1,0 +1,38 @@
+搭建WEB服务器：
+1、安装（重启）httpd。
+2、修改配置文件/etc/httpd/conf/httpd.conf
+	修改网站存放的根目录：DocumentRoot /var/www/html/
+3、虚拟web主机。
+	配置文件：/etc/httpd/conf/httpd.conf或在写在/etc/httpd/conf.d/*.conf
+	配置信息：
+	<VirtualHost IP地址:端口>
+		Servername 此站点的DNS名称
+		DocumentRoot 此站点的网页根目录
+	</VirtualHost>
+	注：一旦使用虚拟web主机功能，所有页面都必须用虚拟web主机来实现。
+4、针对于网页文件存放路径进行访问控制。
+	配置文件：/etc/httpd/conf/httpd.conf或在写在/etc/httpd/conf.d/*.conf
+	配置信息：
+	<Directory 目录的绝对路径>
+		Require all denied  # 拒绝所有人访问
+		Require all granted # 允许所有人访问
+	</Directory>
+	注意：默认httpd服务是不提供访问根（/）下的所有文件，除了/var/www；
+		有必要时可以自己修改访问控制,如果把网站根目录放在根下或在/etc下这些地方
+		selinux会阻止客户端访问，需要setenforce 0，或在修改selinux策略，如下：
+		1、修改selinux的安全上下文值（标签）。
+			chcon [-R] --reference=/var/www/ /webroot/
+
+5、动态网页。
+1、下载模板：http://classroom/pub/materials/webinfo.wsgi  # python编写。
+2、方便用户访问动态网页。
+	页面跳转： Alias 客户端浏览器的网络路径 服务端本机的实际路径  例：
+		Alias /(这里的/是指网页文件的根目录) /var/www/webapp/webinfo.wsgi
+		需要写入到<VirtualHost></VirtualHost>之间。
+	需要安装mod_wsgi,然后在Alias前面加上WsgiScript，不需要空格。	
+
+6、SELinux非默认端口的开放
+	semanage port -l | grep http
+	semanage port -a -t http_port_t -p tcp 8909
+	注：默认情况下，地址栏中，端口优先级高于域名。
+

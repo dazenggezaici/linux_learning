@@ -1,0 +1,266 @@
+
+
+
+
+Your score: 210~300
+
+
+桌面快捷方式 —— 考试系统程序：访问虚拟机、关闭/开机、还原
+
+真机：RHEL 7.2
+虚拟机：RHEL 7.0（没装桌面）
+
+
+从真机访问答题虚拟机 ——
+方式一（网络连接）：ssh  -X  root@虚拟机地址
+方式二（没有网络）：virsh console 虚拟机名 	【ctrl + ] 断开 】
+方式三：桌面快捷方式
+
+
+
+
+资料获取：
+	http://172.40.50.113/rhce/
+
+
+
+
+
+
+# yum -y install  tigervnc
+# vncviewer  172.40.50.113:7000 
+
+
+
+
+﻿
+RHCSA 核心考点列表
+####################################################
+
+一、开考准备 —— 
+1. 重设虚拟机的root密码
+重新开启虚拟机，按两次e键，编辑启动参数
+找到 linux16 行，在末尾添加 rd.break console=tty0 ，按 Ctrl + x 启动进入到修复模式
+默认将磁盘Linux根目录挂载到修复模式环境下的 /sysroot，但是只读
+# mount  -o remount,rw  /sysroot
+# chroot  /sysroot
+# echo  密码  |  passwd  --stdin  root
+# touch  /.autorelabel  			//标记，要求重建安全策略
+# exit
+# reboot
+
+
+SELinux机制，为Linux系统提供一套预设的安全保护措施
+
+
+
+2. 为虚拟机配置网络
+
+修改主机名：hostnamectl  set-hostname  主机名
+修改IP地址等网络参数：
+	nmcli connection show
+	nmcli connection show  "连接名" 
+	nmcli connection add  con-name  "连接名"   ifname  "接口名"  type  ethernet 
+	nmcli connection delete  "连接名"
+	nmcli connection modify  "连接名"   ipv4.method  auto|manual  ipv4.addresses  "IPv4地址/掩码长度  默认网关地址"  ipv4.dns  DNS地址  connection.autoconnect  yes
+	nmcli  connection  up|down "System eth0"
+
+	systemctl  enable  NetworkManager
+
+
+
+!!! RHEL 7.2环境
+	nmcli connection modify  "连接名"   ipv4.method  auto|manual  ipv4.addresses  "IPv4地址/掩码长度"  ipv4.gateway  默认网关  ipv4.dns  DNS地址
+
+
+二、系统管理任务 ——
+1. 添加YUM源
+# yum-config-manager  --add-repo  源的URL地址
+# vim  /etc/yum.repos.d/...repo
+[源ID]
+name = 源描述
+baseurl = 源的URL地址
+enabled = 1
+gpgcheck = 0
+
+# yum  repolist
+
+3. 添加用户/组账号
+11. 配置用户账号
+4. 设置文件权限
+基本权限：r、w、x
+	chmod、chown
+ACL访问控制：
+	getfacl
+	setfacl -R -m  user:用户名:权限  文档...
+	setfacl -R -m  group:组名:权限  文档...
+	setfacl -R -b  文档...
+
+6. 建共用目录（SGID）
+附加权限：Set UID、Set GID、粘滞位
+	chmod
+
+5. 配置计划任务
+# crontab  -e  [-u  用户名]
+分  时  日  月  周   任务的命令行
+# systemctl  restart  crond
+# systemctl  enable  crond
+
+7. 升级内核
+# wget  kernel内核文件的URL网址 		【firefox访问】
+# rpm  -ivh  kernel内核文件.rpm
+# reboot
+# uname  -r
+
+
+
+三、文档管理 ——
+13. 查找文件（find）
+find  目录  查找条件
+常用的查找条件：
+	-name、-type、-size、-mtime、-user、-group
+	-exec  处理命令{}  \;
+
+
+14. 检索文本（grep）
+grep  '查找模式'  文件...
+
+查找模式（正则表达式）：
+	关键词
+	^word
+	word$
+	^$
+
+常用的命令选项：
+	-v、-c、-i、-n
+
+
+重定向输出：
+命令行  >  文件
+
+
+16. 创建归档（tar）
+
+制作备份：
+	tar  -zcPf  归档文件.tar.gz   被归档的文档....
+	tar  -jcPf  归档文件.tar.bz2   被归档的文档....
+	tar  -JcPf  归档文件.tar.xz   被归档的文档....
+
+查看备份内容：
+	tar  -tf  归档文件 
+
+释放备份：
+	tar  -xf  归档文件  [-C 目标文件夹] 
+	tar  -xPf  归档文件
+
+
+四、配置应用客户端 ——
+10. 设置NTP时间同步客户端
+# rm  -rf  /etc/chrony.conf
+# yum  -y  reinstall  chrony
+# vim  /etc/chrony.conf
+.. ..
+server  NTP服务器地址   burst
+# timedatectl  set-ntp  yes
+# systemctl  restart  chronyd  
+# systemctl  enable  chronyd  
+
+8. 设置LDAP客户端
+# yum  -y  install  sssd
+# authconfig-tui
+....
+# cd  /etc/openldap/cacerts
+# wget  证书的URL地址
+... ok
+# systemctl restart sssd
+# systemctl enable sssd
+# id  ldapuser0
+
+9. 设置autofs触发挂载+NFS共享客户端
+autofs用途：当有需要的时候自动挂载指定的设备/文件系统；当不再需要的时候自动卸载指定的设备/文件系统
+	主要完成的事项：创建挂载点、挂载NFS共享资源、卸载NFS共享资源、删除挂载点
+
+# yum  -y  install  autofs
+# mkdir  挂载点所在的父目录
+# vim /etc/auto.master
+挂载点所在的父目录	策略文件的路径
+/home/guests		/etc/auto.abcdef
+
+# vim  策略文件的路径
+挂载点的名称	-挂载参数		服务器地址:设备或资源路径
+ldapuser0	-rw	classroom:/home/guests/ldapuser0
+
+
+# systemctl  restart  autofs
+# systemctl  enable  autofs
+
+
+
+五、磁盘分区及存储 ——
+15. 添加逻辑卷 
+# vgcreate  -s  PE大小  卷组名  空闲分区设备
+# lvcreate  -l  PE个数  -n 逻辑卷名  卷组名
+# mkfs.类型  /dev/卷组名/逻辑卷名
+。。。。					【FAT32，mkfs.vfat  -F  32 ...】
+
+
+2. 扩展逻辑卷
+# vgextend  卷组名  空闲分区设备
+# lvextend  -L  新的大小   /dev/卷组名/逻辑卷名
+# blkid  /dev/卷组名/逻辑卷名
+# resize2fs或xfs_growfs  /dev/卷组名/逻辑卷名
+
+
+12. 添加交换分区
+
+# mkswap  空闲分区设备
+# vim  /etc/fstab
+交换分区设备	swap  swap	defaults,pri=优先级  0 0 
+# swapon  -a
+# swapon  -s
+
+
+
+考试环境：只有一个磁盘/dev/vda（/boot、/、剩余空间）
+练习环境：
+	有一个磁盘/dev/vda（/boot、/、没有剩余空间）
+	有一个磁盘/dev/vdb（空磁盘）
+
+考试的时候需要解决的问题 —— 分几个区，每个分区多大
+
+500MiB —— 扩展逻辑卷
+1000MiB —— 新卷组和逻辑卷
+512MiB —— 交换分区
+
+# fdisk  -l  /dev/vda
+。。 。。
+磁盘标签类型：dos				【gpt】
+
+# fdisk  /dev/vda 			【gdisk】
+: p
+: n ==> e，分区编号默认，起始位置默认，结束位置默认
+: n ==> 类型l，编号默认，起始位置默认，结束位置+500M
+: n ==> 类型l，编号默认，起始位置默认，结束位置+1000M
+: n ==> 类型l，编号默认，起始位置默认，结束位置+512M
+: p
+: w
+# partprobe  /dev/vda
+# reboot
+
+
+
+模拟考试环境：
+	firefox  http://localhost/exam/
+
+
+
+
+
+
+
+
+
+
+
+
+####################################################

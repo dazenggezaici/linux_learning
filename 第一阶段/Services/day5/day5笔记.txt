@@ -1,0 +1,153 @@
+rsync同步操作：
+	实现效果：增量拷贝（cp），只传输变化过的数据
+	命令用法：
+		rsync [选项...] 源目录	目标目录  # 同步整个文件夹
+		rsync [选项...] 源目录/	目标目录  # 只同步目录下的数据，一般用这个方法
+	[选项...]：
+		-a  归档模式，相当于-rlptogD（保持什么都不变）
+		-v  显示细节操作信息，如果不想该命令结果输出信息则该选项不加
+		-z  传输过程中启用压缩/解压，在传输大文件时，传输过程中性能会更好
+			提示：默认都是"rsync -avz 源目录/ 目标目录"这种用法
+		-avz --delete  完全同步文件夹，会把目标文件夹多出的文件删除，最常用的选项
+		-n  测试同步过程，不做实际改变，常用于生产环境
+	rsync+ssh：
+		实现效果：两台主机的目录同步
+		上行：rsync -avz --delete /本地目录/ user@host:远程目录/  # 把本地目录的内容同步到对方的目录下
+		下行：rsync -avz --delete user@host:远程目录/ /本地目录/  # 把远程服务器的内容同步到本地目录
+			提示：上行和下行可以理解为上传和下载
+	思考：
+		需要实现实时同步----但是由于有ssh参与会有个密码的问题----用公钥和私钥实现无密码登陆--需要结合inotify
+		生成公钥和私钥：
+			ssh-keygen  --进入交互式界面，直接三敲回车--默认路径--无密码，尽量不要该路径，默认路径为：/root/.ssh/id_rsa
+			ls /root/.ssh
+				id_rsa  id_rsa.pub  # 第一个是私钥，二是公钥
+			ssh-copy-id user@对方IP  # 把公钥传给对方，并把对方密码和主机信息记录
+			注：A用ssh-keygen生成公钥和私钥，并把公钥传给B，最后的效果是A可以无密码登陆B
+			
+inotify实时同步：
+	效果：
+		监控目录变化，一旦变化就同步
+	装包：
+		inotify-tools 这个是个源码包不能用yum源安装
+		包源文件：
+			在services的day1文件夹里有个tools.tar.gz，解压出就有个inotify-tools-3.13.tar.gz,再把该包解压到/自定义
+			ls */inotify-tools-3.13/
+				aclocal.m4    config.h.in   COPYING     libinotifytools  man      src
+				AUTHORS       config.sub    depcomp     ltmain.sh        missing
+				ChangeLog     configure     INSTALL     Makefile.am      NEWS
+				config.guess  configure.ac  install-sh  Makefile.in      README
+		安装依赖包：
+			make&gcc
+			yum -y install make gcc
+		以下步骤都需要在解压后源码包目录（*/inotify-tools-3.13/）下进行
+		配置源码包：
+			指定安装目录/功能模块等选项
+			命令：./configure  # 例：[root@localhost inotify-tools-3.13]# ./configure
+			选项：[--prefix] /目录  # 指定安装目录
+		进行make编译：
+			也是需要在源码包的解压目录下运行
+			命令：make
+			作用：生成一个可以执行的程序，存放到内存里
+		进行make install安装：
+			命令：make install
+			作用：把内存里的可执行文件记录到/usr/local/bin/下
+		验证：
+			ls /usr/local/bin/inotifywait
+				/usr/local/bin/inotifywait  # 出现该程序即为成功
+		总结：
+			1、安装依赖包：make&gcc
+			2、解压源码包：inotify-tools-3.13.tar.gz
+			3、在源码包路径下配置源码包：./configure
+			4、进行make编译：make
+			5、进行make install安装：make install
+			6、验证：/usr/local/bin/inotifywait程序出现
+	
+	inotifywait [选项] 目标文件夹
+		选项：
+			-m，持续监控
+			-r，递归监控
+			-q，减少屏幕输出
+			-e，指定监控的modify，move，create，delete，attrib等事件类别
+	
+	书写shell同步脚本：
+		vim 实时同步.sh
+			#!bin/bash
+			while inotifywait -rqq /opt  # 选项两个q，将输出信息屏蔽
+			do
+				rsync -avz --delete /我方目录/ user@对方IP:/对方目录/  # 把选择v选项去掉也可以不将结果信息输出
+			done &  # 这里的&意思是让脚本在后台运行，不占用终端
+			
+Cobbler装机平台：
+	概述：
+		支持多版本系统安装
+		更新的技术
+		是快速的网络系统部署工具
+		集中管理所需服务，如：DHCP、DNS、WEB...
+		内部集成了一个镜像版本仓库
+		内部集成了一个ks应答文件仓库
+		还提供了包括yum源管理
+		还提供了WEB界面管理
+		还提供服务器电源管理，管理API接口
+		但是也只能支持linux系统，不能支持windows系统
+	兼容性：
+		暂时不支持redhat，我们暂时使用CentOS7
+	虚拟机配置：
+		硬盘大小>50G
+		网络类型 "private1"
+		系统 "带GUI的CentOS系统"
+		正常能用yum源仓库
+		网络配置 "192.168.4.80/24"
+		主机名 "Cobbler.tedu.cn"
+	软件包：
+		与当前笔记同目录下的Cobbler.zip
+	虚拟机基础配置：
+		设置防火墙为trusted
+		设置selinux模式为Permissive，永久配置文件路径：/etc/selinux/config
+	安装软件包Cobbler：
+		将Cobbler.zip下cobbler.zip内的所有rpm包用yum的方法安装
+			yum -y install */cobbler/*
+	配置Cobbler：
+		配置文件：/etc/cobbler/settings
+			next_server:	192.168.4.80	# 设置下一个服务器
+			server:		192.168.4.80	# 设置本机为Cobbler服务器
+			manage_dhcp:	1			# 设置Cobbler管理dhcp服务
+			pxe_just_once:	1			# 防止客户端重复安装操作系统
+		注意：
+			以上选项都是散布在配置文件中，需要用vim的命令模式下敲"/需要查询的单词"来找到该选项，并且变量名后的冒号(:)后必须要接" "(空格)才能再接"值" 
+		主机开机启动项：
+			特点：匹配及停止
+			1.硬盘启动 2.光驱设备 3.U盘 4.网络引导
+	配置Cobbler的DHCP：
+		配置文件：/etc/cobbler/dhcp.template
+			将配置文件里的所有的192.168.1替换为192.168.4
+				命令：在vim的末行模式下敲	%s /192.168.1/192.168.4/g  # %s /旧/新/g
+	释放压缩包中的引导文件：
+		压缩包在Cobbler.zip下有个cobbler_boot.tar.gz，这里用绝对路径解压：
+			tar -xPf cobbler_boot.tar.gz  # -P(大写)选项就是以绝对路径执行，打包时也可以用-P选项，但-P在解压时会强制覆盖绝对路径里的文件
+			ls /var/lib/cobbler/loaders/
+				COPYING.elilo     COPYING.yaboot  grub-x86_64.efi  menu.c32    README
+				COPYING.syslinux  elilo-ia64.efi  grub-x86.efi     pxelinux.0  yaboot  # 看到这些文件就说明成功
+	用shell重启服务：
+		脚本内容：
+			#!/bin/bash
+			for i in cobblerd httpd tftp rsyncd
+			do
+				systemctl restart $i
+				systemctl enable $i
+			done
+		用命令cobbler sync验证服务是否成功启用
+			输出最后的一行为*** TASK COMPLETE ***则说明测试成功
+	导入安装镜像数据：
+		命令：
+			cobbler import	--path=镜像挂载的路径	--name=name(一般填入镜像系统版本的名称)  # 这一步会把系统镜像cp到cobbler自己的目录下
+	查看cobbler已加载的镜像：
+		cobbler list
+	用cobbler网络装机的机器属性：
+		在用cobbler网络装机时主机内存最好大于2G
+		主机默认用户为root，密码为cobbler
+	访问cobbler网页端：
+		firefox https://Cobbler服务器IP/cobbler_web
+
+
+
+

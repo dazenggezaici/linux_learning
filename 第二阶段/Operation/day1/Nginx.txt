@@ -1,0 +1,85 @@
+我的练习环境：
+	client1 eth0: 192.168.4.11
+	proxy1 eth0: 192.168.4.6
+		eth1: 192.168.2.6
+	web3 eth1: 192.168.2.101
+	web4 eth1: 192.168.2.201
+
+nginx:
+	安装：
+	依赖包:gcc pcre-devel openssl-devel
+	[root@proxy nginx-1.10.3]# ./configure   \
+	> --prefix=/usr/local/nginx   \                //指定安装路径
+	> --user=nginx   \                            //指定用户
+	> --group=nginx  \                            //指定组
+	> --with-http_ssl_module                        //开启SSL加密功能
+	
+	更新：
+	tar解包
+	./configure --xxxxx同样配置
+	当前目录下会出现objs的目录
+	make  # 之后不要执行make install
+	在objs目录下会出现nginx,这就是新程序，直接运行新程序就行了
+	备份旧的nginx程序一般在/usr/local/nginx/sbin/nginx
+	然后把objs下的nginx替换到/usr/local/nginx/sbin/目录下
+	make upgrade
+	nginx -s reload
+	
+	配置：
+	配置路径：./nginx/conf/nginx.conf
+	大致框架：
+		全局配置
+		http{
+			xxxx
+			server{
+				listen	xx;
+				server_name	xxxx;
+				location / {
+					root		xx;	#网页跟目录
+					index index.html index.htm
+				}
+			}
+		}
+	一个server就是一个虚拟主机
+	在server{}中加上charset utf-8;  # 设置编码格式
+	
+	开启用户认证：
+		在配置文件中的server{}选项内加：
+			auth_basic "anythings";  # 在后面分号内写提示信息
+			auth_basic_user_file "/nginx/pass";  # 存放用户名密码文件的路径
+		安装httpd-tools包，用htpasswd -c /nginx/pass tom新建密码文件并添加用户tom
+			在密码文件中追加用户jerry：htpasswd /nginx/pass jerry
+	vim中取消注释
+		:85,94s/#//  # 用的就是替换，跟sed指令一致s/old/new/
+
+	https:
+		在/nginx/conf目录下
+			openssl genrsa > cert.key  # 生成私钥
+			openssl req -new -x509 -key cert.key > cert.pem  # 生成证书
+		修改配置文件
+			server {
+				listen       443 ssl;
+				server_name  www.c.com;
+
+				ssl_certificate      cert.pem;  # 如果证书在conf目录
+														下，则这里可以填相对路径
+				ssl_certificate_key  cert.key;  # 同上
+
+				ssl_session_cache    shared:SSL:1m;
+				ssl_session_timeout  5m;
+
+				ssl_ciphers  HIGH:!aNULL:!MD5;
+				ssl_prefer_server_ciphers  on;
+
+				location / {
+				    root   html3;
+				    index  index.html index.htm;
+				}
+			    }
+
+
+
+
+附:
+	linux命令行浏览器：curl
+

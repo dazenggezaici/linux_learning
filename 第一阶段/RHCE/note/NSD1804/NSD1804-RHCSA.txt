@@ -1,0 +1,226 @@
+
+
+曾晔
+
+
+考试时如果需要做还原虚拟机、强制关机、开机、查看虚拟机界面
+
+考试真机桌面 有访问考试系统图标
+真机（RHEL7.3 有图形，无root权限）
+虚拟机（RHEL7.0 没有图形界面，有root权限）
+
+从真机 ssh  -X  root@虚拟机IP地址
+
+考试流程：
+早上09：00以后到考场，携带身份证、笔
+红帽考官提前布置考场环境，通知考生入场
+听考官宣读考试纪律（禁止作弊、禁止交头接耳/东张西望、……）
+听考官指示填写相关资料（身份证号、电子邮箱、姓名拼音、证书号）
+单击“开始考试”后，倒计时开启
+
+成绩邮件在考试之后5个工作日之内（当天晚上）
+
+如果希望公开查询自己的证书号，
+需要去红帽官网注册一个用户，关联自己的证书，并且设置公开
+
+
+资料获取： 
+	QQ群（RHCE考前辅导）：303486093 【群文件 .. ..】
+	http://172.40.50.113/rhce/NSD1804-RHCE.txt
+
+考试样题（禁止外传）：
+	http://172.40.50.113/rhce/rhcsa.pdf
+	http://172.40.50.113/rhce/rhce.pdf
+
+模拟题：
+	http://localhost/exam/
+
+讲师机桌面（北京）：
+	vncviewer  172.40.50.113:7000
+
+考场环境：
+	真实机 RHEL7.4（有桌面 ==》考试窗口程序）
+	虚拟机 RHEL7.0（没有桌面）
+
+
+ssh  -X  root@虚拟机地址
+
+﻿
+RHCSA 核心考点列表
+####################################################
+
+一、开考准备 —— 
+1. 重设虚拟机的root密码
+1）如何进入到一个recovery恢复模式（不需要密码）
+在开机时按两次 e 键，进入内核引导参数的编辑状态
+找到 linux16 这一行，末尾添加  rd.break  console=tty0 
+按 Ctrl  x  进恢复模式（内存中运行的临时的Linux环境）
+2）重新设置密码
+真正的根系统被挂载到恢复模式的 /sysroot 目录，而且只读
+# mount  -o  remount,rw  /sysroot
+# chroot  /sysroot
+# echo  redhat  | passwd  --stdin  root
+# touch  /.autorelabel
+3）重起系统，以新设置密码登入系统
+# exit
+# reboot
+
+2. 为虚拟机配置网络
+
+# hostnamectl  set-hostname  主机名
+
+对于RHEL7.0版本系统
+# nmcli  con  mod  "连接名"  ipv4.method  manual  ipv4.addresses  "IP地址/掩码长度  默认网关"  ipv4.dns  DNS服务器地址  connection.autoconnect  yes
+
+对于RHEL7.2及以上版本系统
+# nmcli  con  mod  "连接名"  ipv4.method  manual  ipv4.addresses  IP地址/掩码长度  ipv4.gateway  默认网关  ipv4.dns  DNS服务器地址  connection.autoconnect  yes
+
+
+二、系统管理任务 ——
+1. 添加YUM源
+1）删除旧配置
+# rm  -rf  /etc/yum.repos.d/*.repo
+2）禁止签名检查
+# vim  /etc/yum.conf
+gpgcheck=0
+3）添加新的软件源配置
+# yum-config-manager  --add  软件源的访问地址
+
+3. 添加用户/组账号
+11. 配置用户账号
+4. 设置文件权限
+6. 建共用目录（SGID）
+5. 配置计划任务
+7. 升级内核
+1）找到内核文件（kernel-版本号-....rpm）的下载地址
+2）下载内核安装包
+# wget  下载地址
+3）安装内核
+# rpm  -ivh  内核文件的路径
+
+三、文档管理 ——
+13. 查找文件（find）
+14. 检索文本（grep）
+16. 创建归档（tar）
+
+
+四、配置应用客户端 ——
+10. 设置NTP时间同步客户端
+1）装包 chrony
+# rm  -rf  /etc/chrony.conf 		//删除错误配置
+# yum  -y  reinstall  chrony  	//重装对应的软件包
+2）配置 /etc/chrony.conf  	【考试时可能预设有错误】
+server  NTD服务器的地址  iburst
+
+3）起服务 chronyd
+
+
+8. 设置LDAP客户端
+用途：通过集中的服务器为客户机提供用户账号
+1）装包：sssd
+2）配置工具：
+    authconfig-gtk（图形，考试时可能不好用）
+    authconfig-tui（文本界面）
+3）起服务：sssd
+
+教学环境里的yum源不可用 
+原因：真机通过NFS共享提供给classroom软件资源，如果这个资源无法访问，那么虚拟机server0也就无法访问
+解决办法：
+1）真机上需要开启 nfs-server
+2）真机上需要关闭防火墙服务 firewalld
+3）真机上需要禁用SELinux保护机制
+4）重起 classroom 虚拟机
+
+
+
+9. 设置autofs触发挂载+NFS共享客户端
+
+LDAP服务器 —— classroom
+    起LDAP服务端，提供用户账号（ldapuser0）及密码
+    起NFS服务端，提供用户的家目录 /home/guests/ldapuser0
+LDAP客户机 —— server0
+    通过sssd服务、authconfig-tui配置
+    把classroom上的/home/guests/ldapuser0在server0上出现
+
+如何实现“把classroom上的/home/guests/ldapuser0在server0上出现”？
+—— 手动mount挂载，不方便（挂载/卸载XX用户家目录需要手动）
+—— 配置autofs自动挂载（按需挂载/卸载）
+    （1）当用户ldapuser0登录时，自动创建挂载点并挂载主目录
+    （2）当用户ldapuser0退出后，5分中后自动卸载主目录，并且删除挂载点
+
+服务端的目录位置
+   classroom.example.com:/home/guests/ldapuser0
+客户端的目录位置
+   /home/guests/ldapuser0
+
+实现方法：
+1）装包 autofs
+2）配置
+# mkdir /home/guests/  //提前准备家目录（挂载点）的父目录
+# vim  /etc/auto.master
+挂载点的父目录  	自定义挂载策略文件的绝对路径
+/home/guests 	/etc/guest.rule 
+# vim  /etc/guest.rule 	 		//提供策略文件
+挂载点名  		-挂载参数  	设备的路径
+ldapuser0 	-rw,v3   	classroom.example.com:/home/guests/ldapuser0
+3）起服务 autofs
+
+五、磁盘分区及存储 ——
+15. 添加逻辑卷
+2. 扩展逻辑卷
+考试时 vo 是现成的，不需要自己创建
+
+12. 添加交换分区
+
+
+考试环境的磁盘情况：
+虚拟机只有一块磁盘 /dev/vda （包括 /boot 、卷组、剩余空间）
+
+练习环境的磁盘情况：
+虚拟机有磁盘 /dev/vda（包括 /boot等，没有剩余空间） 
+虚拟机有磁盘 /dev/vdb（空磁盘，全部空闲）
+
+
+
+
+
+分区规划操作 ——
+1）总览所有题目，确定需要分几个区、每个分区的大小？
+      新增的第1个分区（500M，逻辑卷扩展）
+      新增的第2个分区（1000M，自建逻辑卷）
+      新增的第3个分区（512M，交换分区）
+2）再执行分区操作，fdisk分区过程中尽量不要用d
+# fdisk  /dev/vdb
+先 n 建扩展分区（使用全部剩余空间）
+再 n 建逻辑分区（+500M）
+再 n 建逻辑分区（+1000M）
+再 n 建逻辑分区（+512M）
+w 保存退出
+3）分区保存后记得partprobe刷新，再重起虚拟机
+# parprobe  /dev/vdb
+# reboot
+
+####################################################
+
+破密码
+命令行配置网络
+authconfig-tui配置LDAP客户端
+通过autofs挂载LDAP用户家目录
+分区规划
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

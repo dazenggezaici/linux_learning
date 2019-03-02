@@ -1,0 +1,518 @@
+教学环境介绍
+
+  优先开启虚拟机classroom,优先一秒钟即可
+
+真机使用rht-vmctl辅助工具
+• 控制教学用虚拟机
+ – 格式:rht-vmctl  控制指令   虚拟机名     
+ – 常用控制指令:
+]# rht-vmctl  reset  classroom  //先重置资源服务器
+]# rht-vmctl  reset  server     //再重置练习虚拟机
+]# rht-vmctl  reset  desktop    //再重置练习虚拟机
+
+练习搭建Yum仓库
+[root@server0 ~]# rm -rf /etc/yum.repos.d/*
+[root@server0 ~]# vim /etc/yum.repos.d/dvd.repo
+ [dvd]
+ name=rhel7
+ baseurl=http://classroom.example.com/content/rhel7.0/x86_64/dvd/
+ enabled=1
+ gpgcheck=0
+
+[root@server0 ~]# yum repolist 
+[root@server0 ~]# yum -y install  xeyes
+
+######################################################
+环境准备:设置防火墙区域为trusted
+虚拟机Server
+[root@server0 ~]# firewall-cmd --set-default-zone=trusted 
+
+虚拟机Desktop
+[root@desktop0 ~]# firewall-cmd --set-default-zone=trusted 
+
+#######################################################
+安全Web服务(https:安全的超文本传输协议  443)
+
+– 公钥:主要用来加密数据
+– 私钥:主要用来解密数据(与相应的公钥匹配)
+– 数字证书:证明拥有者的合法性/权威性(单位名称、
+有效期、公钥、颁发机构及签名、......)
+– Certificate Authority,数字证书授权中心:负责证书
+的申请/审核/颁发/鉴定/撤销等管理工作
+
+
+虚拟机Server0:构建安全的Web服务
+1.部署网站证书(营业执照)
+]# cd /etc/pki/tls/certs/
+]# wget http://classroom.example.com/pub/tls/certs/server0.crt
+
+]# ls
+
+2.部署根证书(授权中心的信息)
+]# cd /etc/pki/tls/certs/
+]# wget http://classroom.example.com/pub/example-ca.crt
+]# ls
+
+3.部署私钥(用于解密)
+]# cd /etc/pki/tls/private/
+]# wget http://classroom.example.com/pub/tls/private/server0.key
+
+]# ls
+
+4.安装mod_ssl软件包,支持加密通信
+]# yum -y install mod_ssl 
+]# rpm -ql mod_ssl
+/etc/httpd/conf.d/ssl.conf
+
+5.修改配置文件/etc/httpd/conf.d/ssl.conf
+补充:vim 末行模式   输入 :set  nu    #开启行号功能
+[root@server0 /]# vim /etc/httpd/conf.d/ssl.conf
+ 59  DocumentRoot  "/var/www/html"      #指定存放网页路径
+ 60  ServerName  www0.example.com:443   #指定网站的域名
+指定网站证书
+100 SSLCertificateFile  /etc/pki/tls/certs/server0.crt
+
+指定私钥匙
+107 SSLCertificateKeyFile /etc/pki/tls/private/server0.key
+
+指定根证书(授权中心的信息)
+122 SSLCACertificateFile /etc/pki/tls/certs/example-c    a.crt
+
+6.重起httpd服务            
+[root@server0 /]# systemctl  restart  httpd
+
+7.验证:
+[root@desktop0 ~]# firefox https://www0.example.com
+
+    点击---->"我已了解可能的风险"----->"确认安全例外"
+
+######################################################
+邮件服务器的构建
+
+• 电子邮件服务器的基本功能
+– 为用户提供电子邮箱存储空间(用户名@邮件域名)
+– 处理用户发出的邮件 —— 传递给收件服务器
+– 处理用户收到的邮件 —— 投递到邮箱
+
+   SMTP:用户发出的邮件协议   默认端口25
+   pop3:用户收到的邮件协议   默认端口110
+
+ DNS服务器:虚拟机classroom
+    server0.example.com
+     
+   邮箱帐号: lisi@server0.exmaple.com
+
+虚拟机server0:构建邮件服务  
+1.安装软件包postfix
+[root@server0 /]# yum -y install postfix
+[root@server0 /]# rpm -q  postfix
+
+2.修改配置文件
+[root@server0 /]# vim /etc/postfix/main.cf 
+补充:vim 末行模式   输入 :set  nu    #开启行号功能
+
+  98 myorigin = server0.example.com   #默认补全域名后缀
+  115 inet_interfaces = all    #本机所有网卡都提供邮件服务
+  163 mydestination = server0.example.com  
+                                                     #此字段的值,判断为本域邮件
+3.重起postfix服务
+[root@server0 /]# systemctl  restart  postfix
+
+4.测试收发邮件
+[root@server0 /]# useradd yg
+[root@server0 /]# useradd xln
+使用mail命令发信/收信
+• mail 发信操作
+– mail -s '邮件标题'    -r  发件人     收件人
+– echo  '邮件正文'  |  mail -s '邮件标题'    -r  发件人     收件人
+
+• mail 收信操作
+– mail [-u 用户名]
+
+[root@server0 /]# mail -s  'test01'  -r   yg   xln
+hahaxixihehelele
+.         #只有一个点代表提交
+EOT
+[root@server0 /]# mail -u xln
+Heirloom Mail version 12.5 7/5/10.  Type ? for help.
+"/var/mail/xln": 1 message 1 new
+>N  1 yg@server0.example.c  Tue Jan 15 11:50  18/585   
+& 1   #输入编号1查看邮件
+
+
+######################################################
+parted规划分区
+
+  MBR: 最多有4个主分区   最大支持的空间2TB
+                 1TB=1024GB
+ 
+  GPT: 最多有128个主分区  最大支持的空间18EB
+                  1EB=1024PB
+                  1PB=1024TB
+
+[root@server0 /]# lsblk 
+[root@server0 /]# parted  /dev/vdb
+(parted) mktable gpt     #指定分区模式为GPT
+(parted) print           #输出分区表信息
+(parted) mkpart             #划分新的分区
+分区名称？  []? haha           #分区的名称随意起
+起始点？ 0                  
+结束点？ 2G           
+警告: The resulting partition is not properly aligned
+for best performance.
+忽略/Ignore/放弃/Cancel? Ignore     #选择忽略,留给分区表一些空间
+(parted) unit gb             #使用GB作为显示单位
+(parted) print 
+(parted) mkpart              #划分新的分区
+分区名称？  []? haha
+文件系统类型？  [ext2]? ext4
+起始点？ 2G          
+结束点？ 4G          
+(parted) print   
+                                                                                                                                                        
+[root@server0 /]# lsblk
+                                                    
+
+什么是交换空间
+• 相当于虚拟内存
+– 当物理内存不够用时,使用磁盘空间来模拟内存
+– 在一定程度上缓解内存不足的问题
+
+– 交换分区:以空闲分区充当的交换空间
+– 交换文件:以文件模拟的设备充当的交换空间
+
+1.查看交换空间的信息
+[root@server0 /]# swapon -s
+
+2.格式化交换文件系统
+[root@server0 /]# mkswap /dev/vdb1
+[root@server0 /]# mkswap /dev/vdb2
+[root@server0 /]# blkid /dev/vdb1
+[root@server0 /]# blkid /dev/vdb2
+
+3.启用交换分区
+[root@server0 /]# swapon /dev/vdb1
+[root@server0 /]# swapon -s
+[root@server0 /]# swapon /dev/vdb2
+[root@server0 /]# swapon -s
+[root@server0 /]# swapoff /dev/vdb2     #停用交换分区
+[root@server0 /]# swapon -s
+
+4.开机自动启用交换分区
+[root@server0 /]# vim /etc/fstab 
+/dev/vdb1    swap    swap   defaults  0 0
+/dev/vdb2    swap    swap   defaults  0 0
+
+[root@server0 /]# swapoff  /dev/vdb1
+[root@server0 /]# swapoff  /dev/vdb2
+[root@server0 /]# swapon -a   #专用于检测swap分区是否书写正确
+[root@server0 /]# swapon -s
+
+#######################################################
+配置聚合连接(链路聚合  网卡组队)
+
+      作用:备份网卡设备
+
+                       eth1         eth2  
+
+                                        虚拟网卡: team0 192.168.1.1
+
+– 作用1:轮询式(roundrobin)的流量负载均衡
+– 作用2:热备份(activebackup)连接冗余
+
+  
+虚拟机server:制作链路聚合          
+1.创建虚拟网卡team0   参考: man  teamd.conf  #全文搜索/example
+]# nmcli  connection  add   type  team 
+  con-name  team0  ifname  team0    autoconnect  yes       
+  config  '{"runner": {"name": "activebackup"}}'
+
+  nmcli connection  添加   类型   team(组队)
+    配置文件名  team0  网卡名  team0   每次开机自动启用
+    配置运行模式   热备份模式
+
+# ifconfig    #查看team0网卡信息
+# cat /et(tab)/sysco(tab)/netw(tab)-(tab)/ifcfg-team0
+    生成的网卡配置文件信息
+
+如果有敲错，一定要删除 :  nmcli connection delete team0
+
+2.添加成员
+[root@server0 /]# nmcli connection add type team-slave  con-name team0-1  ifname eth1 master team0 
+
+[root@server0 /]# nmcli connection add type team-slave  con-name team0-2  ifname eth2 master team0 
+
+解析： nmcli connection  添加    类型为   team的成员
+          配置文件名   team0-1  网卡为 eth1   主设备为  team0
+
+如果有敲错，一定要删除 :  nmcli connection delete team0-1
+如果有敲错，一定要删除 :  nmcli connection delete team0-2
+
+3.配置team0的IP地址
+[root@server0 /]# nmcli connection modify team0        ipv4.method manual ipv4.addresses 192.168.1.1/24     connection.autoconnect  yes
+
+[root@server0 /]# nmcli connection up team0  #激活配置
+[root@server0 /]# ifconfig
+
+[root@server0 /]# teamdctl team0 state  #专用于查看team0信息
+
+########################################################
+[root@server0 /]# ifconfig eth2 down   #禁用网卡
+[root@server0 /]# teamdctl team0 state
+
+########################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

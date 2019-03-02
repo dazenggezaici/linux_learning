@@ -1,0 +1,409 @@
+
+
+资料获取： 
+	QQ群（RHCE考前辅导）：303486093 【群文件 .. ..】
+	http://172.40.50.113/rhce/NSD1802-RHCE.txt
+
+考试样题（禁止外传）：
+	http://172.40.50.113/rhce/rhcsa.pdf
+	http://172.40.50.113/rhce/rhce.pdf
+模拟题：
+	http://localhost/exam/
+
+讲师机桌面：
+	vncviewer  172.40.50.113:7000
+
+
+
+考场环境：
+	真实机 RHEL7.4（有桌面 ==》考试窗口程序）
+	虚拟机 RHEL7.0（没有桌面）
+
+
+ssh  -X  root@虚拟机地址
+
+﻿
+RHCSA 核心考点列表
+####################################################
+
+一、开考准备 —— 
+1. 重设虚拟机的root密码
+—— 如何进入recovery模式（不需要密码）？
+1）重起虚拟机，在开机时按两次 e 键，对启动参数进行修改
+2）找到 linux16 行，在末尾添加 rd.break  console=tty0
+3）按 Ctrl  x  启动，进入恢复模式（不需要密码）
+—— 执行设置密码操作？
+# mount  -o  remount,rw  /sysroot
+# chroot  /sysroot/
+# echo  考试要求的密码  |  passwd  --stdin root
+# touch  /.autorelabel  	【通知SELinux重设安全标记】
+—— 退出并重起？
+exit
+reboot
+
+
+2. 为虚拟机配置网络
+
+列出网卡设备及状态：
+nmcli  device  status
+
+添加新的连接：
+nmcli  connection  add  con-name  "连接名"  ifname  网卡名  type  ethernet
+删除连接：
+nmcli  connection  delete  "连接名"
+
+设置网络参数：
+nmcli  con  mod  ipv4.method  manual  ipv4.addresses  "IPv4地址/掩码长度  默认网关"  ipv4.dns  DNS服务器地址  ipv4.dns-search  "默认搜索后缀"  connection.autoconnect  yes 
+
+
+设置网络参数（RHEL7.2开始）：
+nmcli  con  mod  ipv4.method  manual  ipv4.addresses  "IPv4地址/掩码长度"  ipv4.gateway  默认网关  ipv4.dns  DNS服务器地址  ipv4.dns-search  "默认搜索后缀"  connection.autoconnect  yes 
+
+
+网络接口：内核识别的网卡名
+网络连接：管理员指定的配置名
+类别：ethernet、……
+
+
+
+
+
+
+
+二、系统管理任务 ——
+1. 添加YUM源
+3. 添加用户/组账号
+11. 配置用户账号
+4. 设置文件权限
+6. 建共用目录（SGID）
+5. 配置计划任务
+7. 升级内核
+
+
+三、文档管理 ——
+13. 查找文件（find）
+14. 检索文本（grep）
+16. 创建归档（tar）
+
+
+四、配置应用客户端 ——
+10. 设置NTP时间同步客户端
+
+模拟考试题：http://localhost/exam/
+
+8. 设置LDAP客户端
+软件包：sssd
+配置：authconfig-gtk 或者 LANG= authconfig-tui
+
+起服务：sssd
+
+检查是否配置成功：
+# id  ldapuser0
+或者
+# ssh   ldapsuer0@虚拟机地址
+
+
+
+
+9. 设置autofs触发挂载+NFS共享客户端
+任务目标：
+为用户 ldapuser0 在客户机上提供家目录
+由服务器NFS提供 classroom:/home/guests/ldapuser0
+在server0上应该出现  /home/guests/ldapuser0
+
+手动挂载（不方便）：
+mount  classroom:/home/guests/ldapuser0  /home/guests/ldapuser0
+
+autofs（按需/触发挂载）：
+1）当用户需要访问 /home/guests/ldapuser0 时，会由 autofs自动创建挂载点，并且挂载 classroom:/home/guests/ldapuser0
+2）当不再需要访问 /home/guests/ldapuser0 时，会由 autofs自动卸载已挂载到 /home/guests/ldapuser0的资源，并且删除挂载点目录
+!!!! autofs不能创建多层目录
+对策 —— 提前创建好挂载点所在的上一层目录
+
+实现方法：
+1）装包 autofs
+2）配置
+—— 告诉autofs监控指定的目录/home/guests，按照策略文件XXX执行挂载操作
+# vim  /etc/auto.master
+监控目录			策略文件的路径
+/home/guests 	/etc/guests.rule
+—— 提供策略文件（指定当用户访问哪个目录时如何挂载以及挂载哪个资源）
+# vim  /etc/guests.rule
+哪个目录	-如何挂载		哪个设备
+ldapuser0	-rw,v3		classroom:/home/guests/ldapuser0
+3）起服务 autofs
+
+
+补充（适用于多个用户）：
+# vim  /etc/guests.rule
+*	-rw,v3		classroom:/home/guests/&
+
+
+
+五、磁盘分区及存储 ——
+15. 添加逻辑卷
+2. 扩展逻辑卷
+12. 添加交换分区
+
+####################################################
+
+
+﻿
+
+RHCE 核心考点列表
+####################################################
+
+一、安全策略配置 ——
+1. 配置SELinux
+2. 配置SSH访问（+防火墙）
+3. 自定义用户环境（别名设置）
+4.  配置防火墙端口转发
+
+
+二、网络连接配置 ——
+5. 配置链路聚合
+6. 配置IPv6地址
+
+
+三、配置邮件服务器 ——
+
+7. 配置本地邮件服务（零客户邮件服务器 ）
+
+正常/普通邮件服务器：
+1）提供电子邮箱账号，以及电子邮箱存储（比如qq邮箱）
+2）为用户向外发送邮件（比如发给zhsan@163.com）
+3）接收从其他邮件服务器发给本邮箱区域内某个用户的邮件
+
+不正常/零客户邮件服务器：
+1）不提供电子邮箱账号，不提供电子邮箱存储（比如qq邮箱）
+2）为本机程序向外发送邮件（比如发给zhsan@163.com）
+3）不接收从其他邮件服务器发来的邮件
+
+
+
+
+练习任务目标：
+从 server0 上的root发送一封邮件给本机的 student 用户，
+会由 desktop0 上的 student 用户收到此邮件，而且这封邮件显示的发件人是从root@desktop.example.com
+
+在 desktop0 上：
+1）正确配置静态主机名
+# hostnamectl  set-hostname  desktop0.example.com
+2）快速准备实验环境（正常邮件服务器）
+# lab  smtp-nullclient  setup 
+
+
+在 server0 上（零客户邮件服务器）：
+1）正确配置静态主机名
+# hostnamectl  set-hostname  server0.example.com
+2）调整邮件服务配置并启用服务
+# vim  /etc/postfix/main.cf
+100 myorigin = desktop0.example.com
+117 inet_interfaces = loopback-only 	【已有需修改】
+165 mydestination =   				【已有需修改】
+265 mynetworks = 127.0.0.0/8  [::1]/128
+315 relayhost = [smtp0.example.com]  
+
+# systemctl  restart  postfix  
+
+
+测试结果：
+1）从 server0 上的root发送一封邮件给本机的 student 用户
+在server0上执行：
+# echo  "AAAA"  |  mail  -s 'Test1'  student
+2）会由 desktop0 上的 student 用户收到此邮件，而且这封邮件显示的发件人是从 root@desktop.example.com 发来的
+在desktop0上执行：
+# mail  -u  student
+
+排错依据：
+# less  /var/log/maillog
+
+
+
+练习/模拟环境：
+    把server0配置为 零客户邮件服务器
+    把desktop0配置为 正常/后端邮件服务器
+
+考试环境：
+    把system1、system2配置为 零客户邮件服务器
+    由考官提供 正常/后端邮件服务器
+
+
+
+应用场景：
+假设运维工程师的邮箱是 tedu@163.com、CTO主管boss@qq.com
+存放在IDC数据中心的服务器 A，向外发送报警邮件：
+    收件人地址：tedu@163.com，抄送给 boss@qq.com
+    发件人地址：root@服务器A的IP地址
+
+问题：
+1）服务器A不方便接收邮件
+2）就算服务器A能收到邮件，运维工程师不方便收取邮件
+
+
+解决办法：伪装发件人来源（服务A的IP地址 ==》tedu@163.com）
+    收件人地址：tedu@163.com，抄送给 boss@qq.com
+    发件人地址：tedu@163.com
+
+把服务器A配置为一台零客户邮件服务器 ——
+relayhost = [mail.163.com]
+myorigin = 163.com
+inet_interfaces = loopback-only
+mynetworks = 127.0.0.0/8, [::1]/128
+mydestination = 投递域（清空）
+
+
+应付模拟考试（正式考试不用写）：
+local_transport = error:报错信息
+
+
+
+辅助检查工具：
+# lab  smtp-nullclient  grade
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+四、配置文件服务器/客户端 —— 
+8. 通过Samba发布共享目录
+9. 配置多用户Samba挂载
+
+10. 配置NFS共享服务
+配置简单NFS共享服务器 ——
+软件包：nfs-utils 默认已安装
+配置文件：/etc/exports
+起服务：nfs-server
+
+典型的集中用户认证模式：
+方式1：LDAP服务提供用户名 + LDAP服务提供密码认证
+方式2：LDAP服务提供用户名 + kerberos服务提供密码认证
+
+方式2的优势：通行证机制（一次密码验证、多次免密码登录）
+
+实现安全NFS共享的前提条件：
+参与安全NFS通信的所有主机，都需支持同一个LDAP+kerberos认证
+
+考试环境：LDAP+kerberos提前配好的
+练习环境：lab  nfskrb5  setup
+
+
+配置安全NFS共享服务器 ——
+软件包：nfs-utils 默认已安装
+0）目录准备
+# mkdir  -p  /protected/project
+# chown  ldapuser0  /protected/project
+1）配置文件
+# vim  /etc/exports
+/protected	172.25.0.0/24(rw,sec=krb5p)
+2）部署用于kerberos加密的密钥文件到 /etc/krb5.keytab
+# wget   http://题目给的网址  -O  /etc/krb5.keytab
+3）起服务
+# systemctl  restart  nfs-server  nfs-secure-server
+
+
+11. 挂载NFS共享
+挂载简单NFS共享目录 ——
+软件包：nfs-utils 默认已安装
+配置文件：/etc/fstab
+起服务：无
+
+挂载安全NFS共享目录 ——
+软件包：nfs-utils 默认已安装
+0）准备挂载点
+# mkdir  /mnt/nfssecure
+1）部署用于kerberos加密的密钥文件到 /etc/krb5.keytab
+# wget   http://题目给的网址  -O  /etc/krb5.keytab
+2）起服务：nfs-secure（!! 不要与服务端的系统服务混淆）
+# systemctl   restart   nfssecure
+3）改挂载配置
+# vim  /etc/fstab
+server0.example.com:/protected  /mnt/nfssecure  nfs  sec=krb5p,_netdev  0  0 
+# mount  -a
+# df  -hT  /mnt/nfssecure 	【检查所在位置及使用情况】
+测试挂载点访问权限：
+# ssh  ldapuser0@desktop0.example.com
+Password: kerberos
+$ touch  /mnt/nfssecure/project/a.txt
+
+
+常见错误1：执行 mount  -a 提示 incorrect option 。。
+原因：客户机的 nfs-secure 服务未启用
+
+常见错误2：执行 mount  -a 提示 access  denied
+原因：
+1）服务端的 nfs-secure-server 未启用
+2）服务端的 /etc/exports 授权的客户机地址不正确（比如 172.25.0.0）
+3）客户机或服务器没有加入kerberos认证（忘记lab。。。操作）
+4）客户机或服务器的密钥有问题（klist  -k  密钥文件路径）
+
+常见错误3：启动 nfs-secure-server服务失败
+原因：
+1）/etc/exports 文件有错误
+2）密钥文件 /etc/krb5.keytab 不存在
+
+常见错误4：访问挂载点的时候卡住不动
+原因：
+1）虚拟机内存不足
+2）服务器端的NFS相关服务重起
+
+
+
+/etc/exports文件的配置格式 ——
+目录的绝对路径		客户机的地址(ro)
+
+客户机的地址写法：
+172.25.0.11
+172.25.0.0/24
+*.example.com
+
+19. 配置iSCSI服务端
+20. 配置iSCSI客户端
+
+
+五、配置网站服务器 ——
+12.实现一个web服务器
+13.配置安全web服务
+14.配置虚拟主机
+15.配置web内容的访问
+16.实现动态WEB内容
+
+
+六、Shell脚本编程 —— 
+17. 创建一个脚本
+18. 创建一个添加用户的脚本
+
+
+七、配置及管理数据库 ——
+21. 配置一个数据库
+22. 数据库查询（填空）
+
+####################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

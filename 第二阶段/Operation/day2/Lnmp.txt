@@ -1,0 +1,81 @@
+LNMP： linux nginx mariadb,mysql php,python
+
+需要安装的软件包：
+	nginx
+	mariadb mariadb-server mariadb-devel
+	php php-mysql php-fpm(这个包不能直接yum装，在lnmp压缩包有)
+
+启动服务：
+	nginx  # 80端口
+	mariadb  # 3306端口
+	php-fpm  # 9000端口,可以用netstat -ntulp | grep 端口查看服务是否启动
+
+构建连接（关联性）：
+	动静分离：
+		用户访问静态数据：
+			直接把结果发给用户
+		用户访问动态数据（php）：
+			将请求转发给9000端口（php-fpm）
+nginx配置
+	...  # location /{}匹配的优先级最低,在其他地址栏找不到的在匹配根(/)
+			location支持正则，用法location ~ \.php$ {},波浪号是必要
+		server_name www.todd.com;
+		location / { allow all; }  # location用于匹配用户访问的地址栏
+		location /abc { deny 1.1.1.1; }  # 匹配www.todd.com/abc
+		location /xxxx { deny all; }  # 匹配www.todd.com/xxxx
+		location ~ \.php$ {
+		    root  php;  # 网页根目录
+		    fastcgi_pass  127.0.0.1:9000;  # 转发给本机9000端口进行处理
+		    include  fastcgi.conf  # 导入conf目录下的配置文件fastcgi.conf
+		}
+	...
+
+php-fpm配置文件：  # /etc/php-fpm.d/www.conf
+	[www]
+	listen = 127.0.0.1:9000            //PHP端口号
+	pm.max_children = 32                //最大进程数量
+	pm.start_servers = 15                //最小进程数量
+	pm.min_spare_servers = 5            //最少需要几个空闲着的进程
+	pm.max_spare_servers = 32            //最多允许几个进程处于空闲状态
+
+
+地址重写：
+	server{
+	...
+		rewrite /旧地址 /新地址 redirect;  # 地址都是相对于网站根网址
+	...				#加上redirect就是把地址也重写，
+					#就是访问www.xx.com/旧地址-->>www.xx.com/新地址
+	...	
+		rewrite ^/ www.todd.com;  # 完全重写域名,只要是/开头，如
+								#	www.xx.com/dsa
+								#	www.xx.com/dasda
+		rewrite ^/(.*) http://www.xx.com/$1 redirect;  # 保留子域名不变
+									# $1表示前的(.*)括号内
+									# 的内容
+		if ($http_user_agent ~* firefox) {  # 识别客户端firefox浏览器
+		rewrite ^(.*)$ /firefox/$1;  # 可以用同样的方法分离电脑与手机界面
+					上面的~*是模糊匹配且不精确匹配大小写
+}
+
+
+log:
+	tailf xxx日志文件，实时监控文件后十行
+	nginx访问日志文件路径：./nginx/logs/access.log
+	nginx错误日志路径：./nginx/logs/error.log
+	PHP错误日志文件路径：/var/log/php-fpm/www-error.log
+
+./nginx/logs/access.log日志内容：
+#log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+#                  '$status $body_bytes_sent "$http_referer" '
+#                  '"$http_user_agent" "$http_x_forwarded_for"';
+例：127.0.0.1 - tom [22/Feb/2019:14:35:54 +0800] "GET / HTTP/1.1" 200 612 "-" "Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0"
+
+
+
+
+
+
+
+
+
+

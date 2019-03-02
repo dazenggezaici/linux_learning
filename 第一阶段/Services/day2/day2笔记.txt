@@ -1,0 +1,145 @@
+DNS服务
+一、域名的种类
+1、一级域名
+.com	.net	.edu	.cn	.org
+2、二级域名
+.net.cn	.edu.cn	.com.cn
+3、三级域名
+.sina.com.cn	.pku.edu.cn
+二、域名体系结构：树形结构
+所有的域名都必须以点作为结尾,如：www.qq.com.	www.baidu.com.
+
+--serverDNS所需要安装的包：bind bind-chroot
+
+--bind-chroot:提供虚拟根环境
+
+--DNS默认端口：TCP/UDP 53
+
+--DNS系统服务名：named
+
+--/etc/named.conf主配置文件
+--/var/named记录域名于IP地址对应关系
+
+--修改主配置文件/etc/named.conf
+options {
+        directory       "/var/named";
+};
+
+zone "tedu.cn" IN {
+        type master;
+        file "tedu.cn.zone";
+};
+
+--建立地址库文件
+cp -p /var/named/named.localhost /var/named/tedu.cn.zone
+-p是保持于源文件的权限一致
+
+编辑/var/named/tedu.cn.zone文件：
+$TTL 1D
+@       IN SOA  @ rname.invalid. (
+                                        0       ; serial
+                                        1D      ; refresh
+                                        1H      ; retry
+                                        1W      ; expire
+                                        3H )    ; minimum
+tedu.cn.        NS      svr7.tedu.cn.
+svr7.tedu.cn.   A       192.168.4.7
+www.tedu.cn.    A       192.156.4.110
+ftp.tedu.cn.    A       192.168.4.120
+或者可以写成：
+$TTL 1D 
+@       IN SOA  @ rname.invalid. (
+                                        0       ; serial
+                                        1D      ; refresh
+                                        1H      ; retry
+                                        1W      ; expire
+                                        3H )    ; minimum
+tedu.cn.        NS      svr7
+svr7            A       192.168.4.7
+www             A       192.156.4.110
+ftp             A       192.168.4.120
+说明以下，举个例子"NS    svr7.tedu.cn."=="NS    svr7"
+在没写.tedu.cn.为后缀是，会自动加上.tedu.cn.；这里"NS    svr7.tedu.cn."要这么写就要写全，"tedu.cn."最后点也不能漏了。
+
+实现多区域的DNS服务器
+修改/etc/named.conf
+多写内容：
+zone "qq.com" IN {
+        type master;
+        file "qq.com.zone";
+};
+然后需要新增一个与/var/named/tedu.cn.zone类似的文件
+$TTL 1D
+@       IN SOA  @ rname.invalid. (
+                                        0       ; serial
+                                        1D      ; refresh
+                                        1H      ; retry
+                                        1W      ; expire
+                                        3H )    ; minimum
+qq.com.         NS      svr7
+svr7            A       192.168.4.7
+www             A       192.156.4.130
+www             A       192.156.4.131(这里相当于做了DNS负载均衡)
+www             A       192.156.4.132(这里相当于做了DNS负载均衡)
+ftp             A       192.168.4.140
+mail            A       192.168.4.150
+*               A       192.168.4.100(这里*是泛域名解析，防止用户把www打成wwww然后访问不了网站)
+
+内置函数：$GENERATE 制造连续的数字
+用法：$GENERATE 起始点-结束点
+例：	$GENERATE	pc$.tedu.cn	A	192.168.0.$
+解析记录的别名
+配置文件位置：/var/named/tedu.cn.zone
+例：	tts	CNAME	ftp		--表示的是tts的解析结果与ftp的解析结果一致。
+
+DNS子域授权：
+递归解析
+qq.com.	NS	svr7
+bj.qq.com.	NS	pc207
+svr7		A	192.168.4.7
+pc207		A	192.168.4.207
+
+缓存DNS服务器
+也是需要安装bind bind-chroot包
+配置缓存DNS服务器，修改：/etc/named.conf
+options {
+        directory       "/var/named";
+        forwarders      { 176.121.0.100; };  关键的一行
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+					 i
+					 i
+					 i
+					 i
+					 i
+					 i
+					 i
+					 i
+					 i
+--------------------------------o---------------------------------------
+					 i
+					 i
+					 i
+					 i
+					 i
+					 i
+					 i
+					 i
+					 i
+					 i

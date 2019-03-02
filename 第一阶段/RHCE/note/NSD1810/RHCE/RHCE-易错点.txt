@@ -1,0 +1,310 @@
+﻿ftp://172.40.50.125/share/
+
+
+127.0.0.1/exam
+
+考试说明需要看什么：
+1、看主机名
+2、咱们两台主机域的子网
+3、禁止网段的子网
+4、找不到用户的密码，就去考试说明找
+
+
+
+
+
+重置练习环境：
+rht-vmctl  reset  classroom
+rht-vmctl  reset  server
+rht-vmctl  reset  desktop
+
+
+RHCE 核心考点列表
+####################################################
+
+一、安全策略配置 ——
+1. 配置SELinux
+2. 配置SSH访问（+防火墙）
+3. 自定义用户环境（别名设置）
+4.  配置防火墙端口转发
+
+二、网络连接配置 ——
+5. 配置链路聚合
+6. 配置IPv6地址
+
+三、配置邮件服务器 ——
+7. 配置本地邮件服务
+
+四、配置文件服务器/客户端 
+8. 通过Samba发布共享目录
+9. 配置多用户Samba挂载
+10. 配置NFS共享服务
+11. 挂载NFS共享
+19. 配置iSCSI服务端
+20. 配置iSCSI客户端
+
+五、配置网站服务器 ——
+12.实现一个web服务器
+13.配置安全web服务
+14.配置虚拟主机
+15.配置web内容的访问
+16.实现动态WEB内容
+
+
+六、Shell脚本编程 —— 
+17. 创建一个脚本
+18. 创建一个添加用户的脚本
+
+
+
+七、配置及管理数据库 ——
+21. 配置一个数据库
+22. 数据库查询（填空）
+
+
+RHCE 核心考点列表
+####################################################
+
+一、安全策略配置 ——
+1. 配置SELinux
+临时配置和永久配置都要设置
+两台主机都要设置
+
+2. 配置SSH访问（+防火墙）
+sshd服务端配置文件：/etc/ssh/sshd_config（注意d！！）
+
+两台主机都需要写
+
+
+
+3. 自定义用户环境（别名设置）
+
+注意：
+设置别名的时候等号两边不要有空格
+考试时候是什么命令都要写全，不要简写
+两台机器都需要做
+建议desktop端将reboot的别名也写上
+
+4.  配置防火墙端口转发
+server端：trusted、禁止网段、端口转发
+desktop端：trusted、禁止网段
+
+
+
+二、网络连接配置 ——
+5. 配置链路聚合
+
+
+注意：
+1、成员的自动连接
+2、team名字
+3、注意是热备份还是轮询
+4、配置状态的时候的符号'{}'
+5、两台主机都需要做
+
+
+
+6. 配置IPv6地址
+
+如果没有设置主机名，做完ipv6主机名会变成localhost
+所以一定要为两个虚拟机设置固定主机名：
+hostnamectl  set-hostname  主机名
+
+
+
+
+三、配置邮件服务器 ——
+7. 配置本地邮件服务
+
+练习环境：
+1、server0做空客户端邮件服务器、desktop0做路由邮件服务器
+2、必须加local_transport，要不评分出错
+
+考试环境：
+1、server0和desktop0都做空客户端邮件服务器，classroom做路由邮件服务器
+2、按照要求加local_transport
+
+
+
+如果考试的时候你的配置文件是复制过去的，这时候就需要去改两点：
+1、安全上下文（直接复制到对方目录）
+2、权限
+
+
+
+
+五、配置网站服务器 ——
+12.实现一个web服务器
+13.配置安全web服务
+14.配置虚拟主机
+15.配置web内容的访问
+16.实现动态WEB内容
+
+注意：
+1、默认网站以00开头
+2、网页文件不要下载到root其他目录下再移动到网页目录中
+3、动态网页需要监听端口，80端口不要重复监听
+4、动态网站开端口命令小技巧：
+	journalctl -xn
+	cat /var/log/messages | grep 8909
+5、验证动态网页时一定要加:8909
+
+注意！！！
+配置虚拟主机的题一定有要求将我们创建的目录设置为某个用户可写
+ If you want to allow /usr/sbin/httpd to bind to network port 8909
+                                                   Then you need to modify the port type.
+                                                   Do
+                                                   # semanage port -a -t PORT_TYPE -p tcp 8909
+                                                       where PORT_TYPE is one of the following: http_cache_port_t, http_port_t, jboss_management_port_t, jboss_messaging_port_t, ntop_port_t, pup
+
+
+
+
+
+
+
+
+
+
+
+
+
+四、配置文件服务器/客户端 
+8. 通过Samba发布共享目录
+9. 配置多用户Samba挂载
+10. 配置NFS共享服务
+11. 挂载NFS共享
+19. 配置iSCSI服务端
+20. 配置iSCSI客户端
+
+
+
+
+8. 通过Samba发布共享目录
+
+没有读权限四大坑：
+1、没有创建指定目录
+2、没有关闭防火墙
+3、没有给目录权限
+4、设置selinux
+
+没有写权限五大坑：
+1、没有创建指定目录
+2、没有关闭防火墙
+3、没有给目录权限
+4、设置selinux
+5、配置文件的写权限
+
+
+
+注意：挂载不成功原因：
+1、没有写sec= ！！！
+2、cifs包没有安装
+3、没有创建指定用户
+4、没有创建挂载目录
+
+验证不成功：
+可能加了-d选项
+
+
+10. 配置NFS共享服务
+11. 挂载NFS共享
+下载文件：
+	/etc/krb5.keytab
+配置文件和fstab中安全验证：
+	sec=krb5p
+
+想要获得写权限：
+	1、配置文件的rw权限
+	2、目录拥有写权限
+
+验证两点：
+	1、nfsmount有读权限，没有写权限
+	2、nfssecure有读权限，没有写权限,project有读写权限
+
+nfs-secure-server服务启动失败，可能的原因：
+1）密钥文件没有或者内容不对
+2）共享目录没有创建
+3）/etc/exports配置有错误
+
+客户端测试的时候没有写入权限，可能的原因：
+1）服务端没有给权限
+2）客户端访问的目录路径不对（没有挂载）
+3）客户端没有获得通行证（不是ssh登录的）
+4）服务端nfs-secure-server没有重启
+注意：/protected/project目录一定要安题目要求改成指定拥有人
+
+注意：nfs可能由于sever端启动太慢导致挂载不上，这时我们需要在/etc/rc.d/rc.local文件中添加（并给这个文件执行权限）：
+for i in {1..20};do
+	mount -a 
+	sleep 5
+done
+
+
+注意：如果题目要求指定服务器为v4的话我们就去改配置文件
+/etc/sysconfig/nfs修改RPCNFSDARGS=" -V 4"
+
+
+
+19. 配置iSCSI服务端
+20. 配置iSCSI客户端
+
+注意：
+1、修改完客户端iqn记录需要重启iscsid服务
+2、配置其自动发现：
+把第2个 startup 的值改成 automatic
+# systemctl  enable  iscsi
+
+UUID=.. .. 【UUID是格式化文件系统时生成的唯一编号】
+
+# vim  /etc/bashrc
+.. ..
+alias  reboot='sync; reboot -f'
+# source  /etc/bashrc
+
+
+
+
+
+
+17. 创建一个脚本
+18. 创建一个添加用户的脚本
+
+注意：
+1、创建题目要求的文件名
+2、输出信息必须为题目要求（多空格什么的都不行）
+3、错误输出要记得（12分！！！）
+
+
+
+
+七、配置及管理数据库 ——
+21. 配置一个数据库
+22. 数据库查询（填空）
+
+
+一定要commit提交
+考试的时候看人名的时候需要切换成英文
+
+
+
+
+
+
+
+semanage port -a -t PORT_TYPE -p tcp 8909
+                                                        where PORT_TYPE is one of the following: http_cache_port_t, http_port_t, jboss_managemen
+                                                    
+
+
+
+
+
+
+
+
+
+
+
+
+####################################################

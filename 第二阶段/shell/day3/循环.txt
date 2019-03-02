@@ -1,0 +1,96 @@
+FOR循环：
+	基本结构：
+		for 变量 in 值集
+		do
+			指令
+		done
+	ping172.25.0.1-172.25.0.254的所有主机
+	for i in `seq 254`
+	do
+		ping -c 2 -i 0.2 -w 1 172.25.0.$i &>/dev/null
+		[ $? -eq 0 ] && echo "172.25.0.$i主机可达"
+	done
+WHILE循环：
+	基本结构：
+		while []
+		do
+			指令
+		done
+	无限循环结构：
+		while:
+		do
+			指令
+		done
+CASE分支：  # 简化版的IF判断，功能没有IF强大
+	基本结构：
+		case 变量 in
+		模式1)  # 这里的条件可以两个A|B满足A或B都执行下面命令
+			命令序列1;;
+		模式2)
+			命令序列2;;
+		*)
+			默认命令序列
+		esac
+	
+
+seq 3  # 跟py的range(3)类似
+	1
+	2
+	3
+	
+查看网络状态：
+	netstat命令
+		选项：
+			-n以数字格式显示端口
+			-t显示TCP连接端口
+			-u显示UDP连接端口
+			-l显示服务正在监听的端口信息
+			-p显示监听的端口服务的名称
+		查看nginx服务开启情况：
+			netstat -ntulp | grep nginx
+	
+shell函数：
+	函数名() {
+		命令1
+		命令2
+		..n
+	}
+
+echo -e  # 扩展echo输出
+echo -e "\033[32mABC\033[0m"
+	# \033[ 固定格式
+	# 32 为字体颜色号  40后面是修改背景颜色
+	# m 固定格式
+	# ABC 为输出字符串
+	# \033[0m 将默认颜色改为默认颜色，背景颜色改为默认
+
+
+
+
+
+
+复习源码包安装
+安装nginx
+安装依赖包：
+	gcc,openssl-devel,pcre-devel
+进入nginx源码包路径
+	./configure
+	make
+	make install
+执行程序
+	/usr/local/nginx/sbin/nginx  # 开启服务
+	/usr/local/nginx/sbin/nginx -s stop  # 关闭服务
+
+
+
+
+
+
+
+
+
+
+
+
+
+
