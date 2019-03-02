@@ -1,0 +1,3 @@
+*.js linguist-language=Document
+*.css linguist-language=Document
+*.html linguist-language=Document
