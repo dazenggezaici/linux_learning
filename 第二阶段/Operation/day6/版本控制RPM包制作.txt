@@ -67,6 +67,87 @@ svn [选项]:
 还原：
 	svnadmin load ./project_new < my.bak
 
+RPM包制作：
+需要安装rpm-build
+执行命令：rpmbuild -ba nginx.spec  # 这一步会报错，但一定要有
+执行完后会生成./rpmbuild/目录
+把nginx.tar.gz放入./rpmbuild/SOURCES/目录下
+在./rpmbuild/SPECS/目录下新建一个以.spec结尾的文件,如nginx.spec
+nginx.spec:
+	Name:nginx  #重点，尽量不要修改 行1
+	Version:1.12.2  #重点，尽量不要修改 行2
+	Source0:nginx-1.12.2.tar.gz  #重点，不能修改 行9
+	Release:	1%{?dist}  # 第几次打包，默认第一次，一般不修改
+	Summary:web  # 包的提示信息
+	#Group:  # 不是组包，注释掉
+	License:GPL  # 开源协议
+	URL:www.nginx.com  # 随便一个网址
+	#BuildRequires:  # 编译源码时提示依赖库信息
+	#Requires:  # rpm安装时提示依赖库信息
+	%description
+		# 这里写安装完后的需要显示的详细信息
+	
+	%post
+	useradd -s /sbin/nologin nginx
+	%setup -q  # 自动解压tar.gz并进入安装目录下
+	./configure  # 自动配置，默认是%configure，后面也可以接--with-http_ssl_module...，不要指定用户，
+				# 除非在这行之前插入%post后面接安装完后执行的脚本，然后新建需要的用户
+	%files
+	%doc
+	/usr/local/nginx/*  # 指定需要将哪些文件打包到rpm包里
+nginx.spec模板：
+Name:nginx
+Version:1.12.2
+Release:        1%{?dist}
+Summary:this is a web server
+
+#Group:         
+License:GPL
+URL:www.nginx.com
+Source0:nginx-1.12.2.tar.gz
+
+#BuildRequires: 
+#Requires:      
+
+%description
+this is a web server to.
+
+%post
+id nginx &> /dev/null
+[ $? -ne 0 ] && useradd -s /sbin/nologin nginx
+%prep
+%setup -q
+
+
+%build
+./configure --user nginx --group nginx --with-http_ssl_module --with-stream --with-http_stub_status_module
+make %{?_smp_mflags}
+
+
+%install
+make install DESTDIR=%{buildroot}
+
+
+%files
+%doc
+/usr/local/nginx/*
+
+
+%changelog
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

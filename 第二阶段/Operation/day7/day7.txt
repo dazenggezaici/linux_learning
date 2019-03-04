@@ -1,0 +1,130 @@
+配置GRE VPN  # 主机1----主机2
+lsmod | grep ip_gre  # 查看是否有加载gre模块
+modprobe ip_gre  # 加载ip_gre模块
+modinfo ip_gre  # 查看模块信息
+rmmod xxx  # 删除（取消激活）模块
+在主机1上：  # eth1:10.0.0.2
+	ip tunnel add tun0 mode gre remote 10.0.0.1 local 10.0.0.2
+	# 记不住后面可以用ip tunnel help查看后面的命令
+	ip link show  # 查看所有网卡
+	ip link set tun0 up  # 开启隧道
+	ip addr add 10.10.10.10/24 peer 10.10.10.11/24 dev tun0			在主机2上：  # eth1:10.0.0.1
+	ip tunnel add tun0 mode gre remote 10.0.0.2 local 10.0.0.1
+	# 记不住后面可以用ip tunnel help查看后面的命令
+	ip link show  # 查看所有网卡
+	ip link set tun0 up  # 开启隧道
+	ip addr add 10.10.10.11/24 peer 10.10.10.10/24 dev tun0
+总结：
+	加载模块
+	创建tunnel通道，设置模式，绑定本机和对方（remote）IP
+	开启隧道
+	给隧道配置IP，本机和对方
+
+创建PPTP VPN:
+	server: linux
+	client: windows
+server:
+	安装pptpd-1.4.0-2.el7.x86_64.rpm（在lnmp_soft/vpn下）
+	修改配置文件/etc/pptpd.conf,在最后追加以下两行
+		localip 10.0.0.1  # 填入自己（server）IP
+		remoteip 192.168.3.100-200  # 需要分配给客户端的IP地址池
+	/etc/ppp/options.pptpd
+		require-mppe-128  # 40行，默认就有
+		ms-dns 8.8.8.8  # 66行，默认注释，分配给客户端的DNSserver
+	/etc/ppp/chap-secrets
+		todd * 123456 *  # 客户端账户，服务器名，密码， 客户端IP
+	echo "1" > /proc/sys/net/ipv4/ip_forward  # 开启路由转发
+	systemctl restart pptpd
+	iptables -t nat -A POSTROUTING -s 192.168.3.0/24 -j SNAT --to-source 10.0.0.1  # 要翻墙才需要输入
+
+SETUPVPN:可科学上网
+
+创建L2TP+IPSec VPN
+server:
+yum -y install libreswan
+/etc/ipsec.conf
+	include /etc/ipsec.d/*.conf  # 最后一行，默认注释，需要取消注释
+vim /etc/ipsec.d/myipsec.conf
+	conn IDC-PSK-NAT
+	    rightsubnet=vhost:%priv
+	    also=IDC-PSK-noNAT
+
+	conn IDC-PSK-noNAT
+	    authby=secret
+		ike=3des-sha1;modp1024
+		phase2alg=aes256-sha1;modp2048
+	    pfs=no
+	    auto=add
+	    keyingtries=3
+	    rekey=no
+	    ikelifetime=8h
+	    keylife=3h
+	    type=transport
+	    left=10.0.0.2  # server（自己）IP
+	    leftprotoport=17/1701
+	    right=%any
+	    rightprotoport=17/%any
+
+vim /etc/ipsec.d/mypass.secrets
+	10.0.0.2 %any: PSK "randpass"  # server(自己)IP %谁能连: PSK "域贡献密钥"
+systemctl start ipsec
+netstat -ntulp |grep pluto  # 占用4500和500端口
+部署XL2TP服务
+yum localinstall xl2tpd-1.3.8-2.el7.x86_64.rpm  # （在lnmp_soft/vpn下）
+vim /etc/xl2tpd/xl2tpd.conf
+[lns_default]
+	...
+	ip range = 192.168.3.100-192.168.3.200  #分配给客户端的IP地址池
+	local ip = 10.0.0.2  # server(自己)IP
+	...
+vim /etc/ppp/options.xl2tpd
+	require-mschap-v2                                         //默认注释，需要取消注释，强制要求认证
+	#crtscts                                                //注释或删除该行
+	#lock                                                //注释或删除该行
+vim /etc/ppp/chap-secrets
+	todd * 123456 *  # 客户端账户，服务器名，密码， 客户端IP
+systemctl restart xl2tpd
+netstat  -ntulp |grep xl2tpd  # 占用1701端口
+echo "1" > /proc/sys/net/ipv4/ip_forward  # 开启路由转发
+iptables -t nat -A POSTROUTING -s 192.168.3.0/24 -j SNAT --to-source 10.0.0.1  # 需要跨网段才开，开启nat
+
+NTP服务器：
+	yum -y install chrony  # 一般默认安装
+	vim /etc/chrony.conf
+		allow 192.168.4.0/24  # 在中间插入内容，allow 客户端IP段
+		local stratum 10  # 设置NTP服务器的层数量，默认注释，值不能超过15
+	systemctl restart chronyd
+
+PSSH:  批量（并发）ssh用户
+yum -y install pssh(lnmp_soft)
+vim /etc/hosts
+	192.168.2.100 host1
+	192.168.2.200 host2
+	192.168.4.10 host3
+vim /root/host.txt
+	root@host1
+	host2
+	host3
+ssh -o StrictHostKeyChecking=no  # 该选项可以跳过yes/no的选项
+
+pssh -i -A -H 'host1 host2 host3' -x '-o StrictHostKeyChecking=no' \  # -i 显示操作远程机的结果， -A 用密码连接（默认用密钥） -H 后面接主机 -x 用ssh的选项
+>echo hello  # 按需要对虚拟机的操作
+[选项] -o /tmp  # 将输出结果重定向到文件
+
+ssh-keygen -N '' -f /root/.ssh/id_rsa  # 非交互式生成密钥
+ssh-copy-id host1  # 将生成的密码复制给远程主机
+
+pscp.pssh -h host.txt /etc/hosts /root/  # 将host.txt中事先写好的主机名的主机，把/etc/hosts文件拷贝到远程主机的/root/目录下
+pslurp -h host.txt /etc/passwd /pass  # 将远程主机的/etc/passwd文件拷贝到本地*./pass目录里,这条命令会在当前执行命令的目录下新建./host1/pass,./host2/pass...文件
+						#这里的/不是根目录，是当前目录新建host1，host2...的文件夹下
+pnuke -h host.txt sleep  # 杀死远程主机的sleep进程
+
+
+
+
+
+
+
+
+
+
