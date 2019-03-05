@@ -1,0 +1,173 @@
+集群：
+	LVS：Linux虚拟服务器
+		特性：性能高，功能少，只支持4层协议，不支持正则
+		与Nginx比，Nginx：性能中，功能多，支持正则
+	前端：调度器，负载均衡层
+	中间：应用服务器群组
+	后端：数据共享库存储层
+	
+	Director Server 调度器--DS
+	Real Server	应用服务器--RS
+	VIP（Director Server对用户提供的IP：Virtual IP）
+	DIP（Director Server连接后端服务器的IP：）
+	RIP（Real Server IP）
+	CIP（客户端IP：client IP）
+
+	LVS工作模式：
+		NAT：请求包回应包都由调度器转发
+		DR：请求包--调度器，回应包--服务器直接发给用户
+		TUN：RS与RS地域分离用VPN连接，用户访问调度器，一般不用
+	LVS调度算法：
+		轮询（常用）
+		加权轮询（常用）
+		最少连接（最核心算法）
+		加权最少连接（最核心算法）
+		源地址散列（类似Nginx的IP-hash）
+	ipvsadm:
+		[选项]
+			-A  # 添加虚拟服务器（集群）--DS
+			-E  # 修改DS
+			-D  # 删除DS
+			-C  # 清除所有规则
+			-L  # 查看LVS规则表
+			
+			-a  # 添加真实服务器（应用服务器）--RS
+			-e  # 修改RS
+			-d  # 删除RS
+			-r  # 后面接RIP:Port,不写端口默认继承DS端口
+			-s  # 指定集群算法,rr(轮询)，wrr（加权轮询），lc（最少连接），wlc（加权最少连接）
+			-t/-u  # TCP/UDP
+			-w  # 指定权重值,前提是DS（集群）模式为wrr|wlc(加权xx算法)
+			-n  # 以数字显示，不加-n会自动把:80显示成:http,:3306显示成mysql,一般配合-L使用
+			-m  # 指定工作模式为NAT，后面无需加值
+			-i  # 隧道模式
+			-g  # DR模式，默认就为DR模式
+			
+		ipvsadm -A -t 192.168.4.5:80 s rr  # 创建一个以TCP协议的192.168.4.5:80的集群，算法为rr（轮询）
+		ipvsadm -a -t 192.168.4.5:80 -r 192.168.2.100:80  # 给集群4.5添加一个RS-2.100,-r后面的主机:端口的端口不写会默认继承集群4.5的端口（80）
+		ipvsadm -E -t 192.168.4.5:80 -s wrr  # 修改集群4.5的算法为wrr(加权轮询)
+		ipvsadm -D -t 192.168.4.5:80  # 删除TCP协议4.5的集群
+		ipvsadm -e -t 192.168.4.5:3306 -r 192.168.2.201 -w 2 -m  # 修改集群4.5:3306中的2.201RS权重为2，模式为NAT模式
+		ipvsadm -d -t 192.168.4.5:3306 -r 192.168.2.200  # 删除集群4.5:3306中的2.200RS
+		ipvsadm -C  # 清空所有规则，默认重启系统--规则全部清空
+		ipvsadm-save -n > /etc/sysconfig/ipvsadm  # 以数字模式保存规则到xx目录下
+	
+	
+	LVS-NAT集群部署：  # 适用于10-20台服务器的集群
+		准备工作：
+		yum -y install ipvsadm
+		DS：192.168.4.5，RS1：192.168.2.100，RS2：192.168.2.200，client：192.168.4.10
+		该模式需要给RS配置网关
+		开启路由转换（proxy）
+			echo "1" > /proc/sys/net/ipv4/ip_forward  # 临时设置
+			vim /etc/sysctl.conf
+				net.ipv4.ip_forward = 1  # 最后追加这一行，永久开启路由转换，需要重启一次才会生效，或者sysctl -p刷新配置文件
+		在DS上配置规则：
+			ipvsadm -A -t 192.168.4.5:80 -s wrr
+			ipvsadm -a -t 192.168.4.5:80 -r 192.168.2.100 -w 1 -m
+			ipvsadm -a -t 192.168.4.5:80 -r 192.168.2.200 -w 1 -m
+			#上述规则马上生效，且因为是内核软件不需要重启服务
+
+	LVS-DR集群部署：
+		DS：
+			eth0：192.168.4.5/24
+			eth0:0：192.168.4.15/24
+		RS1：
+			eth0：192.168.4.100/24
+			eth0:0：192.168.4.15/32
+		RS2：
+			eth0：192.168.4.200/24
+			eth0:0：192.168.4.15/32
+		配置DS的eth0:0网卡：
+			vim /etc/sysconfig/network-scripts/ifcfg-eth0:0
+				TYPE=Ethernet
+				BOOTPROTO=none  # none|static都可以，都为静态IP
+				NAME=eth0:0
+				DEVICE=eth0:0
+				ONBOOT=yes  # 是否开机自启
+				IPADDR=192.168.4.15
+				PREFIX=24  # 子网掩码
+		配置RS1&RS2的eth0:0网卡：
+			vim /etc/sysconfig/network-scripts/ifcfg-lo:0
+				DEVICE=lo:0
+				IPADDR=192.168.4.15
+				NETMASK=255.255.255.255
+				NETWORK=192.168.4.15  # 网络地址
+				BROADCAST=192.168.4.15  # 广播地址
+				ONBOOT=yes
+				NAME=lo:0
+			修改内核参数，防止IP冲突：
+				在/etc/sysctl.conf文件中添加如下四行文本：
+					net.ipv4.conf.all.arp_ignore = 1
+					net.ipv4.conf.lo.arp_ignore = 1  # 不回复ARP请求包
+					net.ipv4.conf.lo.arp_announce = 2  # 不发ARP包（不宣告IP）
+					net.ipv4.conf.all.arp_announce = 2
+					# 上述四条配置只影响lo(回环)口
+				修改内核参数后需要刷新配置：sysctl -p
+		systemctl restart network  # 重启网络即生效
+		最后在DS上配置集群规则：
+			ipvsadm -A -t 192.168.4.15:80 -s wrr
+		   ipvsadm -a -t 192.168.4.15:80 -r 192.168.4.100 -w 1 -g
+		   ipvsadm -a -t 192.168.4.15:80 -r 192.168.4.200 -w 1 -g
+
+	LVS默认无健康检查功能：
+		需要在DS上编写健康检查脚本：
+			#!/bin/bash
+			rip1=192.168.4.100
+			rip2=192.168.4.200
+			vip=192.168.4.15
+			while :  # 实时监测
+			do
+				for i in $rip1 $rip2
+				do
+					curl http://$i &> /dev/null
+					if [ $? -ne 0 ];then  # 无法访问网页后
+						ipvsadm -Ln | grep $i &> /dev/null && ipvsadm -d -t $vip:80 -r $i  # 从集群中删除
+					else  # 正常访问网页后
+						ipvsadm -Ln | grep $i &> /dev/null || ipvsadm -a -t $vip:80 -r $i  # 如果没加入集群就加入集群
+					fi
+				done
+				sleep 5
+			done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
