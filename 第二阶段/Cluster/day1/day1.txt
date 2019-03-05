@@ -1,0 +1,77 @@
+网络存储:
+实验需要新增一块硬盘并做格式化操作
+parted /dev/vdb mklabel gpt
+parted /dev/vdb mkpart primary 1 100%  # 只分一个分区且硬盘格式为gpt
+需要安装targetcli
+进入targetcli交互式界面
+	backstores/block create store /dev/vdb1  # 创建后端存储
+	iscsi/ create iqn.2019-03.cn.todd:proxy  # 创建iscsi共享并设置名字，名字规范:iqn.时间.域名倒写:自定义名称
+	iscsi/iqn.2019-03.cn.todd:proxy/tpg1/acls create iqn.2019-03.cn.todd:client  # 给客户端指定标识
+	iscsi/iqn.2019-03.cn.todd:proxy/tpg1/luns create /backstores/block/store  # 指定iscsi使用的存储
+	iscsi/iqn.2019-03.cn.todd:proxy/tpg1/portals/ create 192.168.4.5 ip_port=3260  # 默认0.0.0.0:3260全部贡献了，这一步可以不设置
+	saveconfig  # 保存配置
+	exit  # 退出
+
+client:
+需要安装iscsi-initiator-utils
+vim /etc/iscsi/initiatorname.iscsi
+	InitiatorName=iqn.2019-03.cn.todd:client  # 需要于服务器上指定的标识一致
+man iscsiadm  # 查看命令找到/examples,可以查到以下命令模板
+iscsiadm --mode discoverydb --type sendtargets --portal 192.168.4.5 --discover  # 发现共享存储，4.5为服务器IP
+iscsiadm --mode node --targetname iqn.2019-03.cn.todd:proxy --portal 192.168.4.5:3260 --login  # 挂载共享存储，这里标识需要填写服务端标识，参数含义同上
+iscsiadm --mode node --targetname iqn.2019-03.cn.todd:proxy --portal 192.168.4.5:3260 --logout  # 取消（弹出）共享存储，参数含义同上
+ISCSI属于块共享：不能多人同时使用，但如果权限为只读时，可以多人挂载
+
+部署Multipath多路径环境
+ISCSI客户端与服务器只间不止一条网络线路（双网卡+）
+需要安装device-mapper-multipath-libs
+cp /usr/share/doc/device-mapper-multipath-0.4.9/multipath.conf /etc/  # 获取配置文件并复制到/etc目录下
+/usr/lib/udev/scsi_id --whitelisted --device=/dev/sda  # 获取网络磁盘的wwid（同一块硬盘ID号不会变）
+	360014052ca9634469104707b1129a18c
+vim /etc/multipath.conf
+	multipaths {
+		multipath {
+			wwid		360014052ca9634469104707b1129a18c
+			alias		yellow  # 将上面wwid的硬盘指定一个别名
+		}
+	}
+systemctl restart multipathd.service
+mount /dev/mapper/yellow /mnt/  # 以后挂载就用别名挂载这样挂两个网络硬盘（其实是同一个硬盘，只是做了双网卡连接）
+multipath -ll(rr)  # 查看挂载激活情况
+
+NFS:
+vim /etc/exports
+	/root           192.168.4.10(rw,no_root_squash)  # root目录必须加no_root_squash
+	/usr/src        192.168.4.0/24(ro)
+NFS正常运作依赖于rpcbind服务
+
+udev规则:
+处理设备命名  # /dev/sda,/dev/sdb,...这些名称都可以通过udev修改
+决定要创建哪些设备文件或链接
+决定如何设置属性
+决定触发哪些事件
+
+udevadm monitor --property  # 实时监测插入设备
+udevadm info --query=property --path=/block/sdb  # 显示已经插入设备的信息
+vim /etc/udev/rules.d/myusb.rules
+	ENV{ID_VENDOR}=="SanDisk",ACTION=="add",RUN+="/usr/bin/systemctl restart httpd"  # 当插入SanDisk设备时就运行/usr/bin/systemctl restart httpd
+		#ID_VENDOR这个信息可以更换，可以为U盘的id
+	【选项】
+	MODE=  # 权限
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
