@@ -1,0 +1,197 @@
+Keepalived高可用服务器:
+	核心功能：
+		1、自动配置LVS规则，健康检查
+		2、类似于路由器的VRRP和HSRP协议的功能
+	部署服务准备工作：  # 以下部署主要针对核心功能的第二个功能配置的实验
+		1、网络：
+			DS：eth0-192.168.4.5
+			RS1：eth0-192.168.4.100
+			RS2：eth0-192.168.4.200
+		2、安装软件包&配置：  # 该软件包系统自带，但光盘自带软件包安装完启动会有BUG，必要时去官网下载源码包安装
+			RS1&RS2：  # RS1为主，RS2为备
+				yum -y install keepalived
+				vim /etc/keepalived/keepalived.conf  # 修改配置文件
+					global_defs {
+						notification_email {
+							admin@tarena.com.cn		//设置报警收件人邮箱
+						}
+						notification_email_from ka@localhost    //设置发件人
+						smtp_server 127.0.0.1			//定义邮件服务器
+						smtp_connect_timeout 30
+						router_id  web1					//设置路由ID号（实验需要修改）
+					}
+					vrrp_instance VI_1 {
+						state MASTER						//主服务器为MASTER（备服务器需要修改为BACKUP）
+						interface eth0					//定义网络接口
+						virtual_router_id 50			//主备服务器VRID号必须一致
+						priority 100						//服务器优先级,优先级高优先获取VIP（实验需要修改）
+						advert_int 1
+						authentication {
+							auth_type pass
+							auth_pass 1111				//主备服务器密码必须一致
+						}
+						virtual_ipaddress {
+							192.168.4.80					//谁是主服务器谁获得该VIP（实验需要修改）
+						}
+					}
+				systemctl start keepalived  # 该软件BUG，每次启动服务就会重启启动防火墙，去官网下载源码包安装就没这个BUG
+				iptables -F  # 每次重启都需要设置
+				setenforce 0  # 每次重启都需要设置
+		3、测试：
+			DS：
+				ping 192.168.4.80
+				...
+			RS1：
+				systemctl stop keepalived
+				# 当关闭RS1的keep服务时，DS上的ping不会中断，
+				# 会自动将ping请求转发给RS2，此时RS2的eth0上会自动配置一个IP为192.168.4.80
+				# 如果RS1上的keep服务重启，则192.168.4.80的IP会重新配置到RS1（主）的eth0上，且自动从RS2（备）的eth0上退出
+		4、总结：
+			上述案例以两台RS做keepalived，DS做客户端，同理可用两台DS做keepalived来实现LVS热备份，即Keepalived+LVS服务器
+
+部署Keepalived+LVS服务器：
+	实现功能：
+		LVS规则自动配置
+		LVS健康检查
+		LVS热备份
+	环境准备：
+		proxy(LVS1,DS1):
+			eth0:192.168.4.5
+			VIP:192.168.4.15(该IP为keepalived自动配置)
+		proxy-clone(LVS2,DS2):
+			eth0:192.168.4.6
+			VIP:192.168.4.15(该IP为keepalived自动配置)
+		web1(RS1):
+			eth0:192.168.4.100
+			VIP:192.168.4.15(该IP需要在lo:0上配置，具体配置过程请参考Cluster.Day2.配置RS1&RS2的lo:0网卡)
+		web2(RS2):
+			eth0:192.168.4.100
+			VIP:192.168.4.15(该IP需要在lo:0上配置，具体配置过程请参考Cluster.Day2.配置RS1&RS2的lo:0网卡)
+	Keepalived配置：
+		proxy:
+			global_defs { router_id proxy }  # global里只需要改router_id
+			vrrp_instance VI_1 {
+				state MASTER  # MASTER为主，BACKUP为备
+				interface eth0  # 在eth0上配置VIP
+				virtual_router_id 51  # 这里主备服务器的值都要一致
+				priority 100  # 优先级，主服务器>备份服务器
+				advert_int 1
+				authentication {
+					auth_type PASS
+					auth_pass 1111  # 主备服务器密码也要一致
+				}
+				virtual_ipaddress {
+					192.168.4.15  # VIP
+				}
+			}
+			virtual_server 192.168.4.15 80 {
+				delay_loop 6
+				lb_algo wrr  # 集群（LVS）采用什么算法
+				lb_kind DR  # 集群（LVS）模式
+				#persistence_timeout 50  # 客户端访问第一次后50秒内服务器都给相同服务器的网页
+				protocol TCP  # TCP
+
+				real_server 192.168.2.100 80 {
+					weight 1
+					TCP_CHECK {
+						connect_timeout 3
+						nb_get_retry 3
+						delay_before_retry 3
+					}
+				}
+				real_server 192.168.2.200 80 {
+					weight 1
+					TCP_CHECK {
+						connect_timeout 3
+						nb_get_retry 3
+						delay_before_retry 3
+					}
+				}
+			}
+	重启服务并测试：
+		systemctl restart keepalived
+		iptables -F  # 每次重启keep服务都必须清空防火墙配置
+		ipvsadm -Ln
+		ip a s eth0
+
+配置HAProxy负载平衡集群：
+	安装：  # 仅在proxy上安装即可
+		yum -y install haproxy
+	配置：
+		vim /etc/haproxy/haproxy.cfg
+			# 删除注释main frontend...后的所有配置，添加如下配置：
+			listen websrv *:80
+				balance roundrobin  # 调度算法为rr(roundrobin)
+				#/usr/share/doc/haproxy-1.x.xx/configuration.txt可以查到其他算法的书写方式
+				server web1 192.168.2.100:80 check inter 2000 rise 2 fall 3
+				server web2 192.168.2.200:80 check inter 2000 rise 2 fall 3
+			listen status  # 开启监控界面
+				bind 0.0.0.0:1080
+				stats refresh 30s
+				stats uri /stats
+				stats realm Haproxy Manager
+				stats auth admin:admin
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

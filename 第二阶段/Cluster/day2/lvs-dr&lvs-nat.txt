@@ -87,7 +87,7 @@
 				ONBOOT=yes  # 是否开机自启
 				IPADDR=192.168.4.15
 				PREFIX=24  # 子网掩码
-		配置RS1&RS2的eth0:0网卡：
+		配置RS1&RS2的lo:0网卡：
 			vim /etc/sysconfig/network-scripts/ifcfg-lo:0
 				DEVICE=lo:0
 				IPADDR=192.168.4.15
