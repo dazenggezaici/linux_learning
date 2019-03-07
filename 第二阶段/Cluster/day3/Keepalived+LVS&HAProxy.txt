@@ -54,7 +54,7 @@ Keepalived高可用服务器:
 		LVS规则自动配置
 		LVS健康检查
 		LVS热备份
-	环境准备：
+	环境准备：  # 该LVS模式为DR，请确保RS与Client有可连通网络
 		proxy(LVS1,DS1):
 			eth0:192.168.4.5
 			VIP:192.168.4.15(该IP为keepalived自动配置)
@@ -91,7 +91,7 @@ Keepalived高可用服务器:
 				#persistence_timeout 50  # 客户端访问第一次后50秒内服务器都给相同服务器的网页
 				protocol TCP  # TCP
 
-				real_server 192.168.2.100 80 {
+				real_server 192.168.4.100 80 {
 					weight 1
 					TCP_CHECK {
 						connect_timeout 3
@@ -99,7 +99,7 @@ Keepalived高可用服务器:
 						delay_before_retry 3
 					}
 				}
-				real_server 192.168.2.200 80 {
+				real_server 192.168.4.200 80 {
 					weight 1
 					TCP_CHECK {
 						connect_timeout 3
@@ -115,6 +115,7 @@ Keepalived高可用服务器:
 		ip a s eth0
 
 配置HAProxy负载平衡集群：
+	特点：类似于Nginx代理的模式
 	安装：  # 仅在proxy上安装即可
 		yum -y install haproxy
 	配置：
