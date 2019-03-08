@@ -68,7 +68,7 @@ node1-3:
 		0 rbd,  # rbd为共享池的名称，一个共享池可以制作多个共享镜像
 	# 至此ceph-osd集群部署完毕
 node1-3：
-	rbd create demo-image --image-feature  layering --size 10G  # 在rbd池中创建名为demo-image的镜像--image-feature后面接需要添加的功能，大小10G
+	rbd create demo-image --image-feature  layering --size 10G  # 在rbd池中创建名为demo-image的镜像--image-feature(分层快照)后面接需要添加的功能，大小10G
 	rbd create rbd/image --image-feature  layering --size 10G  # 与上一条命令类似，rbd/image指明是在rbd池中创建名为image的镜像
 		# 上述命令在所有mon服务器上都可以执行，只需要在一台机器执行一次，其他主机自动同步
 	rbd list  # 显示rbd中的image
@@ -95,29 +95,17 @@ client：
 			id pool image snap device    
 			0  rbd  image -    /dev/rbd0
 
-创建镜像快照：
-	
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+镜像快照：
+	创建：  # 创建快照时请确保所有主机都与镜像断开连接（卸载）
+			# 如果不卸载创建快照，那么此次挂载修改的数据将不会保存在快照中
+		rbd snap create image --snap image-snap1  # 给image创建快照，名为image-snap1
+	恢复：  # 恢复快照时请确保所有主机都与镜像断开连接（卸载）
+		rbd snap rollback image --snap image-snap1 # 恢复image快照为image-snap1
+		rbd snap protect image --snap image-snap1  # 快照image-snap1开启保护
+		rbd snap rm image --snap image-snap1  # 由于上一条开启了保护，这条命令不会成功执行
+		rbd clone image --snap image-snap1 image-clone1 --image-feature layering  # 将image的image-snap1快照作为模板克隆镜像，名为image-clone1
+		# 如果希望克隆镜像可以独立工作，就需要将父快照中的数据，全部拷贝一份，但比较耗时
+		rbd flatten image-clone1  # 改命令就是全部拷贝
 
 
 

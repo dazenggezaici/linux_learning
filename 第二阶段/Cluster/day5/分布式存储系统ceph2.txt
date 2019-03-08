@@ -1,0 +1,93 @@
+cow( copy on write )
+# 写时复制，先将数据做成快照，等后期读写的时候才正在复制到快照里
+qemu-img create -f qcow2 -b .rh7_template.img myrh7.img
+# 创建虚拟磁盘快照，.rh7_template.img为源，会在当前目录生成myrh7.img的快照
+# 当myrh7虚拟机启动时，先找到源，读取源数据写入myrh7.img中
+
+块存储：
+	实例：在真实机创建虚拟机，使用ceph集群中的块存储：
+	真机需要安装ceph-common
+	安装完后将node1的工作目录（/ceph-cluster）下的ceph.conf和ceph.client.admin.keyring文件拷贝到真机的/etc/ceph/目录下，该目录需要安装完ceph-common才有
+
+	vim secret.xml  # 内容为固定格式
+		<secret ephemeral='no' private='no'>
+				<usage type='ceph'>
+				        <name>client.admin secret</name>
+				</usage>
+		</secret>
+
+	virsh secret-define --file secret.xml  # 会生成随即uuid
+		生成 secret 92b14dfe-8104-4374-bd2c-c00c4ce34309
+
+	virsh secret-set-value --secret 92b14dfe-8104-4374-bd2c-c00c4ce34309 --base64 AQB6uIBctSfQGxAAsJIS4oVTvUA8pqhrEqao6g==  # 这里secret后面是之前创建的secret的UUID,base64后面是client.admin账户的密码（cat /etc/ceph/ceph.client.admin.keyring）
+
+	virsh edit 虚拟机配置文件(xml)  # 修改配置文件，立刻生效
+	# 要使用ceph集群的块存储需要配置虚拟的XML文件，需要修改内容：
+	<domain type='kvm'>
+	...  # 在<devices>下
+	<devices>  # 将下面的<disk>下的内容全部删除，改为以下内容
+	...
+    <disk type='network' device='disk'>
+      <driver name='qemu' type='raw'/>
+      <auth username='admin'>
+        <secret type='ceph' uuid='92b14dfe-8104-4374-bd2c-c00c4ce34309'/>
+      </auth>  # uuid是上方生成的
+      <source protocol='rbd' name='rbd/vm1-image'>  # vm1-image为ceph集群共享的镜像名
+        <host name='192.168.4.11' port='6789'/>  # 主机和端口
+      </source>
+      <target dev='vda' bus='virtio'/>  # virtio为性能最好的虚拟磁盘接口
+      <address type='pci' domain='0x0000' bus='0x01' slot='0x07' function='0x0'/>
+    </disk>  # domain不用改,bus需要改，避免与后面设备冲突
+	...
+	</devices>
+	...
+	</domain>
+
+ceph文件系统：
+	需要安装MDSs插件
+	node3来做mds：
+		ceph-deploy mds create node3  # 这一步需要回到node1的工作目录下执行,将node3的mds功能打开（创建）
+	创建存储池：
+		ceph osd pool create cephfs_data 128  # 名为cephfs_data，用于存数据的
+		ceph osd pool create cephfs_metadata 128  # 这两步在node3做，这个池用于存inode
+	创建文件系统：
+		ceph fs new myfs1 cephfs_metadata cephfs_data
+		# 默认，一个ceph集群只能创建1个文件系统，多余的会报错，算是格式化的过程，只是inode和data需要自己定义
+		ceph fs ls  # 查看文件系统信息
+		ceph mds stat  # 查看文件系统状态
+		客户端挂载：
+			mount -t ceph 192.168.4.11:6789:/ /media/ -o name=admin,secret=AQB6uIBctSfQGxAAsJIS4oVTvUA8pqhrEqao6g==
+			df -h /media/  # 检查挂载情况
+
+创建对象存储服务器：
+	需要安装RGW（rados gateway）,ceph-deploy命令都必须在node1的工作目录上进行
+	ceph-deploy install --rgw node3  # 远程到node3安装部署RGW,day4默认ceph软件全部安装了
+	ceph-deploy admin node3  # 将主配置文件同步到node3，当node3为新的主机时才需要
+	ceph-deploy rgw create node3  # 将node3的rgw功能打开
+	登录到node3主机：
+		ss -antlp | grep radosgw  # 默认占用端口为7480
+		ps aux | grep radosgw  # 查看服务信息状态
+		vim /etc/ceph/ceph.conf  # 修改node3上的ceph配置文件
+			[client.rgw.node3]  # 在文件最后追加3行内容
+			host = node3  # 主机为node3
+			rgw_frontends = "civetweb port=8000" # RGW端口设置为8000
+		systemctl restart ceph-radosgw@rgw.node3.service  # 重启服务生效
+		
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

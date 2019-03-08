@@ -1,0 +1,6 @@
+192.168.4.10 client
+192.168.4.11 node1 --osd --mon
+192.168.4.12 node2 --osd --mon
+192.168.4.13 node3 --osd --mon
+192.168.4.14 node4 --MDS
+192.168.4.15 node5 --RGW
