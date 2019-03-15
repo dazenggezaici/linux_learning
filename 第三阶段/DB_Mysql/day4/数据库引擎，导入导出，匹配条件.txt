@@ -1,0 +1,80 @@
+Mysql存储引擎：
+	myisam存储引擎的特点
+		表名.frm  desc 表名;
+		表名.MYI  index(name)
+		表名.MYD  select  * from 表名;
+		支持表级锁  不支持事务、事务回滚、外键
+
+	innodb存储引擎的特点
+		表名.frm  desc 表名;
+		表名.ibd  index(name)+select  * from 表名;
+		事务日志文件：记录对innodb存储引擎的表执行过的操作
+		ib_logfile0
+		ib_logfile1
+		ibdata1
+		支持行级锁定 支持事务、事务回滚、外键
+
+多表查询：
+	1、复制表(备份表)：
+		create table 新建表名 select * from 模板表;
+		# 如果在后面加上不成立的条件，则可实现只复制表结构：
+			create table 新建表名 select * from 模板表 where 0!=0;
+		# 但复制表不会复制Key属性
+	2、多表查询1：
+		select passwd.username,passwd.passwd, shadow.密码 from passwd,shadow where username=用户名 order by passwd.uid;
+	3、多表查询2：
+		where子查询：
+			select passwd.username from passwd where passwd.username in (select shadow.用户名 from shadow where 密码 not in ("!!","*"));
+	4、左右连接查询：
+		左连接：
+			左表 left join 右表 on 查询条件  # 最后显示左表的内容量
+				select * from t2 left join t3 on t2.username = t3.username;
+					# 当t2,t3表字段相同且数据量不同时，可以查到相同信息的值
+		右连接：
+			左表 right join 右表 on 查询条件  # 最后显示右表
+
+mysql管理工具：
+	phpMyAdmin
+		安装php php-mysql httpd
+		将装有php的文件夹放到/var/www/html/目录下
+
+用户授权与权限撤销：
+3.1 什么是授权  : 在数据库服务器上，添加连接用户 并设置权限
+
+	3.2 授权命令格式：
+		mysql> grant  权限列表  on  数据库名  to 用户名@“客户端地址”
+		       identified by "密码" [ with grant option ]；
+
+	3.3 授权库 mysql库 ：记录授权信息
+				user表  记录已有的授权用户
+				db表	记录已有的授权用户对数据库的访问权限
+				tables_priv  记录已有的授权用户对表的访问权限
+				columns_priv 记录已有的授权用户对字段的访问权限
+	3.4 撤销权限命令格式：
+		mysql> revoke 权限列表 on 数据库名 from 用户名@"客户端地址";
+
+	3.5 删除授权用户
+		mysql> drop user  用户名@"客户端地址";
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

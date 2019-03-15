@@ -12,7 +12,7 @@ qemu-img create -f qcow2 -b .rh7_template.img myrh7.img
 	vim secret.xml  # 内容为固定格式
 		<secret ephemeral='no' private='no'>
 				<usage type='ceph'>
-				        <name>client.admin secret</name>
+				        <name>client.admin secret</name>  # 这里的secret时账户名
 				</usage>
 		</secret>
 
@@ -74,20 +74,5 @@ ceph文件系统：
 		systemctl restart ceph-radosgw@rgw.node3.service  # 重启服务生效
 		
 		
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 

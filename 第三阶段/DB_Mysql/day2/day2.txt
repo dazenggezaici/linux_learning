@@ -1,0 +1,13 @@
+insert into school.restrict(name) values("tom");
+# 在表restrict的name插入名称为tom
+# 修改表结构
+alter table 表名 执行动作;
+	add 添加字段
+		alter table 表名 add 字段名称 类型(宽度) 约束条件;
+	modify 修改字段类型
+	change 修改自定名称
+	drop 删除字段
+	rename 修改表名称
+
+alter table school.restrict add phone varchar(30) not null after name;
+表restrict在name列后加多一列phone

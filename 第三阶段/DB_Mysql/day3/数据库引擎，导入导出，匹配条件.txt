@@ -1,0 +1,154 @@
+数据导入&导出：
+	默认检索目录：
+		默认导入&导出目录
+		查看默认检索目录：
+			show variables like "secure_file_priv";
+				secure_file_priv | /var/lib/mysql-files/
+		修改默认检索目录：
+			mkdir /mydata  # 新建自定义存放数据目录
+			chown mysql /mydata/  # 将/mydata/所有者改为mysql
+			vim /etc/my.cnf  # 修改配置文件
+				[mysqld]  # 该选项默认有
+				secure_file_priv="/mydata/"  # 在mysqld选项下加一条规则
+			systemctl restart mysqld  # 重启服务
+	数据导入：  # 源数据可以是txt
+		# 基本用法
+		mysql> load data infile "目录/文件名" into table 数据库.表名 fields terminated by "分隔符" lines terminated by "\n";
+		例：  # 将/etc/passwd文件制作成数据表
+		cp /etc/passwd /mydata/  # 将源数据文件复制到默认检索目录
+		mysql> create database userdb;  # 创建相关数据库
+		mysql> create table userdb.user(  # 创建相关数据表，表结构应与源数据结构一致
+			username char(50),
+			passwd char(1),
+			uid int,
+			gid int,
+			comment char(150),
+			homedir char(150),
+			shell char(50)
+		);
+		load data infile "/mydata/passwd" into table userdb.user fields terminated by ":" lines terminated by "\n";
+			# 上条命令解释：将检索目录(必须为绝对路径)下的passwd文件导入到表userdb.user中，该文件以分号(:)为列，以回车(\n)为行
+		alter table userdb.user add id int primary key auto_increment first;
+			# 该命令在userdb.user表中第一字段插入id,且为主键自动按序增长
+		select * from userdb.user;  # 查看导入结果
+
+	数据导出：
+		# 基本用法
+		mysql> SQL查询 into outfile "目录/文件名" fields terminated by "分隔符" lines terminated by "分隔符";
+			# 后面的列&行的分隔符可以自己定义，可以没有(有默认值)
+		例：  # 将userdb.user表中的字段shell等于/bin/bash的数据导出到文件，且只需要显示用户名和shell
+			select username,shell from userdb.user where shell="/bin/bash"  # 查询条件
+				into outfile "/mydata/ubash.txt"  # 导出到默认检索目录下，名为ubash.txt
+				fields terminated by "#";  # 将列分隔符定为井号(#)
+			cat /mydata/ubash.txt  # 查询指令结果
+				root#/bin/bash
+				lisi#/bin/bash
+
+管理表记录：
+	插入表记录：
+		insert into 表 values();  # 插入一条记录
+		insert into 表 values(),(),();  # 插入多条记录
+		insert into 表(字段) values(对应字段值);  # 插入特定字段的值
+		insert into 表(字段) values(对应字段值),(对应字段值),(对应字段值);  # 插入个别字段的值,多条记录
+		insert into 表(字段1,字段2) values(对应字段值1,字段值2),(对应字段值1,字段值2);  # 插入多个规定字段值，且是多条记录
+			# 注意：如果表中有字段(不能为空，且无默认值)，则必须赋于字段值
+				对于自动增长的字段，可以传入null，会自动赋值，也可以手动填入
+	查询表记录：
+		select 字段名列表 from 库名.表名 where 条件;
+	更新表记录：
+		update 库名.表名 set 字段1=值,字段2=值,字段3=值 where 条件;
+	删除表记录：
+		delete from 库名.表名 where 条件;  # 不加条件会把所有记录删除
+
+匹配条件：
+	基本匹配条件：
+		数值比较：
+			where 字段名 符号 数值  # 符号有(=,>,>=,<,<=,!=)
+		字符比较：
+			where 字段名 符号 "字符串"  # 符号有(=,!=)
+		匹配空/非空：
+			where 字段名 is null  # 匹配该字段名为空
+			where 字段名 is not null  # 匹配该字段名不为空
+		逻辑匹配(多个判断条件)：
+			or  # 逻辑或，多个条件，一个条件成立即可
+			and  # 逻辑与，多个条件都要成立
+			!  # 逻辑非，取反
+			not  # 逻辑非，取反
+		范围内匹配/去重显示：
+			in  # 在..里面就匹配
+				where username in ("adm","sync","root")  # 字段username与后方括号内的值匹配就显示
+			not in  # 不在..里面就匹配
+			between .. and ...  # 在..和...之间就匹配
+			distinct  # 去重显示
+				select distinct shell from user;  # 查询user表中的shell一列，且去除重复选项,留下的就是该表中用户用到的所有解释器
+
+	高级匹配条件：
+		模糊查询：
+			where 字段名 like '通配符';
+			通配符：下划线(_)匹配单个字符，百分比符号(%)匹配0~N个字符
+				select username from user where username like '___%';  # 匹配username字段3个或3个以上字符
+		正则匹配：
+			where 字段名 regexp '正则表达式'
+				select username from user where username regexp '^d.*[0-9]$';  # 匹配username，d开头，数字结尾
+
+		四则运算：
+			字段必须是数值类型，修改查询时都可做运算
+			例：
+				# 查询user表中uid值在1~5之间，显示username和uid+gid的值(列名该为u+g)
+				select username,uid+gid 'u+g' from user where uid between 1 and 5;
+				# 查询user表中username为root的，显示username和自定义的出生日"brith"，计算方法为2019-age(年龄)
+				select username,2019-age 'brith' from user where username="root";
+				
+	操作查询结果：
+		聚集函数：
+			avg 字段名  # 求平均值
+				select avg(uid) from user;
+			sum(字段名)  # 求和
+			min(字段名)  # 最小值
+			max(字段名)  # 最大值
+			count(字段名)  # 统计对应字段的(行)总数
+				select count(*) from user;  # 该方法可以查询user表的总行数 
+		查询结果排序：
+			order by 字段名 [asc|desc]  # asc升序(默认)，desc降序
+				select username,uid from user order by uid desc;  # 查询表user的username和uid，并以uid降序排列
+		查询结果分组：
+			group by 字段名
+				select shell from user group by shell;
+		查询结果过滤：
+			having 条件表达式;
+			SQL查询 having 条件表达式;
+			SQL查询 where 条件 having 条件表达式;
+		限制查询结果显示行数：
+			limit N  # 显示查询结果的前N行
+			limit N,M  # 查询结果的第N+1行开始，显示M行
+				select id,username,shell from user order by uid limit 2,2;
+					# 查询user表，以uid升序排列，显示id,user,shell,最后结果显示升序排行第3，第4位的用户
+
+存储引擎：
+	查看已有表的使用的存储引擎：
+		# mysql5.6版本以上的默认存储引擎都是InnoDB
+		mysql> show create table 表名\G;
+			...ENGINE=InnoDB...
+	查看数据库服务默认使用的存储引擎：
+		mysql> show engines;  # 查询所有支持的引擎
+			InnoDB   DEFAULT  # 结果可显示默认引擎
+	修改默认存储引擎：
+		vim /etc/my.cnf  # 修该配置文件
+			[mysqld]  # 在该选项下新增一条指令，如下：
+			default-storage-engine=myisam
+		systemctl restart mysqld  # 重启数据库服务
+		mysql> show engines;  # 检查修改结果
+	指定该表的存储引擎：
+		create table t6(xxxx)engine=innodb;
+		# 对已存在表的存储引擎修改：
+			alter table t7 engine=innodb;
+	常用存储引擎特点：
+		INNODB：
+			支持外键
+			支持行级锁
+			支持事务&事务回滚
+		MYISAM：
+			支持表级锁
+			表文件个数：3
+
+

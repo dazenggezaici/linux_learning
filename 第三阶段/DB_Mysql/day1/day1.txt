@@ -1,0 +1,83 @@
+Mysql：
+	安装：将mysql-x.x.x.tar下的所有rpm包用yum安装
+	启动：systemctl start mysqld
+	设置密码：
+		grep 'temporary password' /var/log/mysqld.log  # 使用该命令查看初始密码
+		mysql -u'root' -p
+		>>>Z2OCt/v3mb#s  # 使用初始密码进去数据库
+		# 修改密码规则：
+		>>>set global validate_password_policy=0;  # 密码复杂度模式为0
+		>>>set global validate_password_length=6;  # 密码最小长度
+		>>>alter user user() identified by "123456";  # 修改密码为123456
+	连接MySql：
+		mysql [ -h 服务器IP或域名 -u 用户名 -p 密码 数据库名称 ]
+		例：mysql -h 127.0.0.1 -u'root' -p'123456'  # 数据库名可写可不写
+	注意：
+		默认不支持 Tab 键补齐(可以自行下载安装 https://github.com/dbcli/mycli 工具实现自动补齐功能)
+		\c 可以取消书写错误的命令，命令前面写错了不想改在最后加\c则这一条命令不执行
+		操作指令不区分大小写(密码和变量除外)
+		每条 SQL 语句都以分号;结束
+	常用的 SQL 命令分类:
+		DDL 数据定义语言(create,alter,drop)
+		DML 数据操作语言(insert,update,delete)
+		DCL 数据控制语言(grant,revoke)
+		DTL 数据事务语言(commit,rollback,savepoint)
+	基础命令：
+		use mysql;  # 进入mysql数据库
+		select database();  # 查看当前位置，pwd
+		create database tts character set utf8;  # 创建数据库，名为tts
+		drop database tts;  # 删除数据库
+		
+		show character set;  # 查看所有可用编码
+		
+		create table school.student(
+			-> 学号 char(20),
+			-> 姓名 char(20),
+			-> 性别 char(5),
+			-> 手机号 int(11),
+			-> 通信地址 char(50)
+		);  # 创建表student
+		desc school.student;  # 查看表结构
+		insert into school.student values('NSD181001','葫芦娃','男',123456,'北京');
+		# 插入数据，可以同时插入多条：
+			insert into school.student values('NSD181001','葫芦娃','男',123456,'北京')，('NSD181003','爷爷','男',1387777777,'长白山');  # 只有检测到分(;)号才算结束
+		# 修改表数据：
+			update 数据库名.表名 set 性别="女" where 条件;
+			update school.student set 性别="女" where 姓名="葫芦娃";
+			delete from school.student where 学号="NSD181003"  # 删除学号等于xx
+数据类型：
+	数字类型：
+	类型			大小		范围(有符号)		范围(无符号)	用途
+	tinyint 		1 字节 		-128 ~ 127 			0 ~ 255 		微小整数
+	smallint 		2 字节 		-32768 ~ 32767 	0 ~ 65535 		小整数
+	mediumint		3 字节		-2^23 ~ 2^23-1		0 ~ 2^24-1		中整数
+	int				4 字节		-2^31 ~ 2^31-1		0 ~ 2^32-1		大整数
+	bigint 		8 字节		-2^63 ~ 2^63-1		0 ~ 2^64-1		极大整数
+	float 			4 字节											单精度浮点数(小数点)
+	double 		8 字节											双精度浮点数(小数点)
+	decimal 	Decimal(M,D),其中 M 为有效位数,D 为小数位数,M 应大于 D,占用 M+2 字节
+	unsigned 	标记使用无符号存储
+	
+	字符类型：
+	char(字符数) 		固定长度,最大长度 255 字符,不够指定的字符数时自动在右边填补空格,超出指定字符数则无法写入。
+	varchar(字符数) 	可变长度,根据实际数据大小分配存储空间,超出指定字符数则无法写入。
+	text/blob 		字符数大于 65535 时使用
+
+	日期时间类型：
+	datetime 		日期时间类型,占 8 个字符
+		范围 1000-01-01 00:00:00:000000~9999-12-31 23:59:59.999999
+	timestamp 	日期时间类型,占 4 个字节
+		范围 1970-01-01 00:00:00:000000~2038-01-19 03:14:07.999999
+	时间格式:YYYYmmddhhmmss
+	date 			日期类型,占用 4 个字节
+		范围 0001-01-01~9999-12-31
+	time 			时间类型,占用 3 个字节
+		范围 HH:MM:SS
+	year 			年份类型,占用 1 个字节
+		范围 1901-2155
+
+	枚举类型（选择类型）：
+	enum(值 1,值 2,值 3...)  # 单选项
+	set(值 1,值 2,值 3...)  # 多选项
+
+
