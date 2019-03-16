@@ -1,0 +1,103 @@
+数据备份与数据恢复
+
+数据备份方式：
+	按服务器状态：
+		冷备份
+		热备份
+	按备份方法：
+		物理备份
+		逻辑备份
+数据备份策略：
+	完全备份：
+		备份所有数据(对象：一张表，一个库，一台数据库服务器)
+	差异备份：
+		备份新产生的数据，以完全备份为基础，备份新产生数据
+	增量备份：
+		备份新产生的数据，以上次备份为基础，备份新产生数据
+数据物理备份与恢复：
+	备份：
+		将/var/lib/mysql/下的所有文件备份(tar打包压缩)
+	恢复：
+		删除主机/var/lib/mysql/目录下的所有文件
+		将备份文件拷贝到/var/lib/mysql/目录下
+	缺点：
+		备份和恢复时都只能是冷备份(停止mysql服务)
+		只能完全备份
+		存储引擎为innodb时会丢失mysql日志
+逻辑备份：
+	mysqldump：
+		备份：
+			mysqldump -uroot -p密码 库名 > 路径/文件.sql  # 备份文件习惯用.sql结尾
+		[option]：
+			库名：
+				--all-databases  # 该选项可简写为"-A"
+				数据库名
+				数据库名 表名
+				-B 数据库列表(空格分开)
+		恢复：
+			mysql -uroot -p密码 库名 < 路径/备份文件.sql
+			# 恢复表时，数据库需要有对应放该表的库
+				需要提前创建一个库用于存放该表
+			# 备份和恢复时会加行级锁
+	实时增量备份：
+		使用mysql服务自带的binlog日志实现的
+		启动mysql的binlog日志：
+			vim /etc/my.cnf
+				[mysqld]  # 添加如下两行
+				server_id=50  # 指定值，0~255
+				log-bin=/mylog/mysql.log  # 指定存放日志路径，不指定路径默认为/var/lib/mysql/
+			chown mysql:mysql /mylog/  # /mylog/目录的控制权给mysql用户
+			systemctl restart mysqld  # 重启服务
+		管理binlog日志文件：
+			手动创建新的日志文件：  # 默认只有在旧日志文件大于1G时才会自动生成新日志文件
+				1、重启mysql服务
+				2、执行 mysql> flush logs;
+				3、mysqldump --flush-logs
+				4、mysql -uroot -p密码 -e "flush logs"
+			mysql> show master status;  # 显示正在使用的日志文件信息
+			删除已有的日志文件：
+				mysql> purge master logs to "mysql.000003";  # 删除日志文件mysql.000003之前的日志
+				mysql> reset master;  # 重置所有日志(即删除所有日志文件)
+			修改日志记录格式：
+				vim /etc/my.cnf
+					[mysqld]  # 在该选项下条加一条命令
+					binlog_format="mixed"  # 记录格式改为mixed(混合型)
+				systemctl restart mysqld  # 重启服务
+				mysql> show variables like "binlog_format"; # 查看当前日志记录格式
+				
+			查看日志文件内容：  # 日志为二进制文件
+				mysqlbinlog /mylog/mysql.000001 | grep -i create  # 查看创建库or表的记录
+				mysqlbinlog /mylog/mysql.000001 | grep -i insert  # 查看插入数据的记录
+			用binlog日志恢复数据：
+				mysqlbinlog /mylog/mysql.000001 | mysql -uroot -p123456
+					# 将日志文件拷贝到其他mysql服务器，在其他mysql服务器上执行上述命令即可实现恢复数据，日志记录了写入指令的所有操作
+				指定偏移量恢复数据：
+					mysqlbinlog --start-position=652 --stop-position=802 /mylog/mysql.000001 | mysql -uroot -p123456
+		
+innobackex：
+	是Xtraackup工具的子组件
+	安装：  # 两个包都是需要格外获取的，在压缩包/soft/mysql/目录下
+		yum -y install libev-4.15-1.el6.rf.x86_64.rpm
+		> percona-xtrabackup-24-2.4.7-1.el7.x86_64.rpm
+	命令：
+		innobackupex --help  # 查看简单帮助
+	完全备份(恢复)：  # 备份时不锁表
+		备份：
+			innobackupex --user root --password 123qqq...A /allbak --no-timestamp
+		恢复：
+			systemctl stop mysqld
+			rm -rf /var/lib/mysql/*  # 将数据删除
+			innobackupex --apply-log /allbak/  # 恢复前准备
+			innobackupex --copy-back /allbak/  # 将文件恢复到/var/lib/mysql
+			chown -R mysql:mysql /var/lib/mysql  # 由于恢复的文件所有者是root，需要改为mysql，所属组一样
+			systemctl start mysqld
+
+	增量备份与恢复：
+		1、完全备份
+			增量备份前一定是先完全备份一遍
+		2、执行增量备份：
+			innobackupex --user root --password 123qqq...A --incremental /new1dir --incremental-basedir=/fullbak --no-timestamp
+
+
+
+
