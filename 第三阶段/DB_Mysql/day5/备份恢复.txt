@@ -97,7 +97,18 @@ innobackex：
 			增量备份前一定是先完全备份一遍
 		2、执行增量备份：
 			innobackupex --user root --password 123qqq...A --incremental /new1dir --incremental-basedir=/fullbak --no-timestamp
-
-
+		增量备份--恢复:
+			将完全备份的文件和增量备份的文件(有几个增量都要)全部拷贝到需要恢复的主机上
+			systemctl stop mysqld  # 停止服务
+			rm -rf /var/lib/mysql/*  # 删除自带的数据
+			innobackupex --apply-log --redo-only /innobak/full/
+				# 拷贝完全备份的日志
+			innobackupex --apply-log --redo-only --incremental-dir=/innobak/new1 /innobak/full/
+				# 将第一次完全备份日志(/innobak/full/)和第一次新增备份数据日志(/innobak/new1)合并到完全备份日志文件(/innobak/full/)下,如果有多次新增数据只需再执行一边这条命令即可,需要修改新增备份日志目录
+			innobackupex --copy-back /innobak/full/
+				# 拷贝备份文件到/var/lib/mysql
+			chown -R mysql:mysql /var/lib/mysql/
+				# 给权限
+			systemctl start mysqld  # 重启服务器即可完成
 
 
