@@ -1,0 +1,900 @@
+ftp://172.40.50.117/2018/soft  软件
+ftp://172.40.50.117/nsd1812/all_note.txt  随堂文档
+
+vns  172.40.50.117  7000
+
+第三阶段 课程内容 
+一、数据库管理15天  数据管理员    DBA
+1.1  RDBMS:  MySQL 10天
+1.2  NoSQL:  Redis 3天  和 MongoDB 2天
+
+二、安全与监控 6天
+2.1 安全 ： 系统安全  服务安全  数据安全  网络安全 
+2.2 监控 :  zabbix服务的使用
+
+
+庞丽静  静静
+panglj@tedu.cn 
+++++++++++++++++DBA1_DAY03+++++++++
+
+   一台车 
+   轮胎  备胎  车架子  真皮座椅 内饰  方向盘  发动机*   
+
+一、MySQL存储引擎
+	1.1 MySQL存储引擎介绍
+		1.1.1 MySQL体系结构 （8个组件）
+		管理工具： MySQL自带的命令 
+		连接池： 验证用户连接和检查系统资源
+		SQL接口： 把sql命令传给mysqld进程处理
+		分析器： 检查sql命令语法
+		优化器： 对执行的sql命令优化
+		查询缓存： 存储查找过的数据(8MB 从物理内存划分出来的)
+		存储引擎：处理表的处理器，不同的存储引擎有不同的功能和
+			  数据存储方式
+		文件系统 ： 机器的硬盘
+
+		1.1.2 存储引擎介绍 ?
+
+	1.2 查看存储引擎
+		1.2.1 查看已有表的使用存储引擎
+			mysql> use userdb;
+			mysql> show create table 表名\G;
+			mysql> show  create table  user\G;
+
+
+		1.2.1 查看数据库服务默认使用的存储引擎
+		    	mysql> show engines;
+	
+		1.3 修改存储引擎
+			1.3.1 修改数据库服务默认使用的存储引擎
+				]# systemctl  stop mysqld						     ]# vim /etc/my.cnf
+				  [mysqld]
+				    default-storage-engine=myisam
+				 :wq
+				]# systemctl  start mysqld
+				]# mysql -uroot -p密码
+				mysql>  show engines;
+				
+			1.3.2 修改表使用的存储引擎
+				mysql> alter table  t7 engine=myisam;
+
+			1.3.3 建表时指定表使用的存储引擎 
+				create  table t8 (name char(10))
+				engine=innodb;
+
+	1.4 常用存储引擎特点
+		1.4.1 MYISAM存储引擎特点
+			支持表级锁
+			不支持外键、事务、事务回滚
+			表文件个数
+				表名.frm   表名.MYD  表名.MYI
+				表结构      数据    index信息
+
+		1.4.2 INNODB存储引擎特点
+			支持外键 
+			支持行级锁
+			支持事务和事务回滚
+			事务特点
+			表文件个数 
+				表名.frm  t6.ibd
+				表结构    数据+index信息
+	        1.4.3 术语解释	
+			外键  
+			行级锁 
+			表级锁
+			事务     登陆  数据操作 断开连接	
+			事务回滚 ：在访问过程中，任意一步操作失败，恢复之前的所有操作
+			
+			事务日志文件：记录对所有innodb存储引擎表的操作
+				ibdata1  没有提交的命令
+
+				已经提交的命令
+				ib_logfile0
+				ib_logfile1
+
+			事务特性：ACID
+				  原子性 一致性  隔离性  持久性
+
+		休息10分钟 到 10：16 
+
+	1.5 工作中建表时，如何决定表使用那种存储引擎？
+		select 操作多的表 ，适合使用myisam存储引擎 优点节省系统资源
+  insert/update/delete 操作多的表 ,适合使用innodb存储引擎  优点并发访问量大		
+
+
+二、数据导入导出
+	2.0  数据导入导出默认检索目录
+		2.0.1 查看默认检索目录名称
+			mysql> show variables  like  "secure_file_priv";
+			+------------------+-----------------------+
+			| Variable_name    | Value                 |
+			+------------------+-----------------------+
+			| secure_file_priv | /var/lib/mysql-files/ |
+			+------------------+-----------------------+
+		2.0.2  修改默认检索目录名称
+			]# mkdir  /mydata
+  			]# chown  mysql  /mydata
+  			]#  vim /etc/my.cnf
+	    			[mysqld]
+				secure_file_priv="/mydata"
+			:wq
+
+			]# systemctl  stop mysqld
+			]# systemctl  start mysqld
+			]# mysql -uroot -p123qqq...A
+			mysql> show variables  like  "secure_file_priv";
+
+	2.1  数据导入：把系统文件的内容存储到数据库的表里
+		2.1.1 命令格式
+                 mysql>  load  data  ifile  "目录名/文件名" into table
+			 数据库名.表名 FIELDS TERMINATED BY   "分隔符"
+			 LINES TERMINATED BY   "\n";
+
+		2.1.2 步骤
+			1 把系统文件拷贝到检索目录下
+			2 根据导入文件的内容创建表
+			3 执行数据导入命令
+
+		2.1.3 例子
+mysql> create database userdb;
+
+mysql> create  table  userdb.user(
+    -> username char(50),
+    -> password char(1),
+    -> uid int,
+    -> gid int,
+    -> comment  char(150),
+    -> homedir  char(180),
+    -> shell  char(50)
+    -> );
+
+mysql> load data infile "/mydata/passwd" into table userdb.user 
+    -> fields terminated by ":" lines terminated by "\n";
+
+mysql> alter table userdb.user  add 
+    -> id int  primary key  auto_increment first;
+
+mysql> select  * from  userdb.user;
+
+休息到 10：15 
+
+	2.2  数据导出：把数据库的表里的记录存放到系统文件
+		2.2.1 命令格式
+		mysql> SQL查询 into   outfile   "目录名/文件名";
+		
+		mysql> SQL查询 into   outfile   "目录名/文件名"
+		       fields  terminated   by   "列分隔符"
+		       lines terminated   by   "行分隔符";
+
+      		2.2.2 例子
+mysql> select * from  userdb.user  into outfile "/mydata/a1.txt";
+
+mysql> select username,shell from  userdb.user  
+       into outfile "/mydata/a2.txt";
+
+mysql> select username,shell from  userdb.user where id<=3  
+       into outfile "/mydata/a3.txt"  
+       fields terminated  by  "#"  lines terminated  by  "???";
+
+]# ls /mydata
+
+]# vim /mydata/a1.txt
+]# vim /mydata/a2.txt
+]# vim /mydata/a3.txt
+                       练习到 10:38
+三、管理表记录
+	3.1 插入表记录insert into
+	 	1 向表中插入1条记录给所有字段赋值
+		  insert into  库名.表名  valuse(字段值列表);
+mysql> insert into  userdb.user 
+values
+(43,"bob","x",2000,2000,"test user","/home/bob","/bin/bash");
+
+		2 向表中插入多条记录给所有字段赋值
+		   2.1 命令格式 
+                   insert into  库名.表名
+		   values
+		   (字段值列表),(字段值列表),(字段值列表);
+		   2.2 例子
+			mysql> insert into  userdb.user 
+				values
+	(443,"lili","x",2000,2000,"test user","/home/bob","/bin/bash"),
+	(44,"lucy","x",2000,2000,"test user","/home/bob","/bin/bash");
+
+		3 向表中插入1条记录给个别字段赋值
+		   3.1 命令格式
+			insert into  库名.表名(字段名列表)values(值列表);
+		   3.2 例子
+			mysql> insert  into userdb.user(username,shell) 
+       			values("jack","/sbin/nologin");
+
+		4 向表中插入多条记录给个别字段赋值
+		  4.1 命令格式
+			insert into  库名.表名(字段名列表)
+			values(值列表),(值列表),(值列表);
+		  4.2 例子
+			insert  into userdb.user(username,shell)
+			values
+			("jack","/sbin/nologin"),
+			("jerry","/sbin/nologin"),
+			("alice","/sbin/nologin");
+
+	3.2 查询表记录
+		3.2.1 命令格式
+		      select  字段名列表 from 库名.表名 [where 条件]；
+
+		2.2.2 例子
+mysql> select  * from userdb.user;
+mysql> select  username,homedir from userdb.user where id <=2;
+mysql> select  * from userdb.user where id <=2;
+
+休息到 11：15
+
+	3.3  更新表记录 update
+		3.3.1 命令格式
+		update  库名.表名 set 字段名=值，字段名=值 【where 条件】；
+		
+		3.3.2 例子
+		mysql> update  userdb.user set password="a" ;
+
+		mysql> update  userdb.user set password="x" 
+		       where username="root" ;
+	3.4 删除表记录 
+		3.4.1 命令格式
+			delete from 库名.表名【 where 条件 】;
+		3.4.2 例子
+		mysql> select  * from userdb.user where username="bob";
+		mysql> delete from userdb.user;
+
+四、匹配条件 （select  update  delete）
+	4.1 基本匹配条件
+	    4.1.1 数值比较 >  >=  <  <=  =  != 
+			where  字段名 符号  数字
+		select  name ,uid  from user where uid <= 10;
+		select username,uid,gid from user where uid = gid;
+		select  name ,uid  from user where id = 10;
+
+	    4.1.2  字符比较 =  !=
+			where  字段名 符号 "字符串"；
+		select username,shell from user where  shell!="/bin/bash";
+		select username from user where  username="root";
+
+	   4.1.3 匹配空/非空
+			where  字段名 is null;
+			where  字段名 is not null;
+		select username,gid from user where gid is null;
+		select username,gid from user where gid is not  null;
+
+	   4.1.4 逻辑匹配 (多个判断条件)
+		 and  逻辑与 多个判断条件必须同时成立
+		 or   逻辑或 多个判断条件某一条件成立即可
+		 ! 或 not 逻辑非  取反
+select  * from user where  username="bin"  and uid=3 and shell="/bin/bash";
+select  * from user where  username="root"  and uid=0 ;
+  
+select  * from user where  username="bin"  or uid=3 or shell="/bin/bash";
+	
+	 4.1.5 范围内匹配/去重显示
+		in  			在...里
+		not 			不在...里
+		between ....and... 	在...之间
+		disinct  		去重显示
+
+		select username from user 
+			where username in ("adm","sync","root","mysql");
+
+		select username,uid from user 
+		 	where uid in (11,29,1000,33,7);
+
+		select username,shell from user 
+			where shell not in ("/bin/bash","/sbin/nologin");
+
+		select  * from user where  id between 5 and 10;
+	
+		select  distinct  shell  from user;
+		select  distinct  gid  from user;
+		() 提高判断优先级
+	4.2 高级匹配条件
+		4.2.1 模糊查询 like
+			where 字段名  like   '通配符';
+			_  匹配单个字符
+			%  匹配0~N个字符
+		  select username from user where  username like '____';
+		  select username from user where  username like '_____';
+		  select username from user where  username like '%a%';
+		  select username from user where  username like '__%__';
+
+		4.2.2 正则表达式
+			元字符  ^ $  . *  []
+			where 字段名  regexp   '正则表达式’;
+
+	   select username , uid  from user  where  uid  regexp '^....$';
+	   select username   from user  where  username  regexp 't$';
+	   select username   from user  where  username  regexp '^r.*t$';
+	
+           insert into user(username)
+	      values("2yaya"),("ya5ya"),("yay8a"),("yaya7");
+	
+           select username   from user  where  username  regexp '[0-9]';
+		4.2.3  四则运算
+		       计算符号  +  -  *  /  %
+
+		update user set gid=gid+1 where id <= 5;
+	
+		select username,uid+gid xjz  
+                       from user where  username="root";
+
+		alter table  user add age tinyint  default 29  
+		      after username;
+
+		select username,2019-age  csnf from 
+                      user where  username="root";
+
+		() 提高执行的优先级
+
+		  select username,uid,gid,(uid+gid)/2  pjz from 
+			user where username="bin";
+
+	4.3 操作查询结果
+		4.3.1 聚集函数(mysql服务软件自带的对数据做统计的命令)
+			avg(字段名)			//统计字段平均值
+			sum(字段名) 			//统计字段之和
+			min(字段名) 			//统计字段最小值
+			max(字段名) 			//统计字段最大值
+			count(字段名) 			//统计字段值个数
+			select  avg(uid)  from user ;
+			select  avg(uid)  from user where id  <=10;
+	
+			select  sum(uid)  from user;
+			select  min(uid) from user where shell!="/bin/bash";
+			select  max(uid) from user where shell!="/bin/bash";
+
+		select count(username) from user where shell!="/bin/bash";
+		select count(username) from user;
+		select count(*) from user;
+
+		练习10分钟到 15：32  休息到 
+
+		4.3.2 查询结果排序 order by  
+		      SQL查询  order   by   字段名   [ asc | desc ];
+
+			select username,uid from user 
+				where uid between 10 and 1000 
+				order  by  uid;
+
+			select username,uid from user 
+				where uid between 10 and 1000 
+				order  by  uid desc;
+
+		4.3.3 查询结果分组  group by  字段名
+
+			select shell from user group by shell;
+
+			select shell from user where  uid <=1000 
+				group by shell;
+
+		4.3.4 查询结果过滤 having 
+			SQL查询   having   条件表达式;
+			SQL查询   where   条件   having   条件表达式;
+			SQL查询   group   by   字段名   having   条件表达式;
+select username from user where shell!="/bin/bash" having username="gdm";
+select username from user  where uid <=1000 and   username="gdm";
+select username from user  where uid <=1000 having username="gdm";
+			select shell from  user where shell!="/bin/bash" 
+				group by shell having shell="/bin/sync";
+
+	   4.3.5 限制查询结果显示行数limit
+			SQL查询  limit  N; 	//显示查询结果前N条记录
+                        SQL查询  limit  N,M; 	//显示指定范围内的查询记录
+
+	   select  * from user where  uid >=10 and  uid<=500 limit 3;
+
+	   select  id,username,homedir from user 
+		 where  uid >=10 and  uid<=500 limit 3,3;
+		 
+		select username,uid,homedir from user where uid >1000  
+			order by  uid  desc  limit 1;
+
++++++++++++++++++++DBA1_DAY04++++++++++++++++++++
+
+	 学号  姓名
+ 缴费表   9     张三丰
+ 班级表   9
+ 成绩表   9
+ 就业表   9
+
+
+ select name from 班级表 where  name not in  (select name from 缴费表 where 班级="nsd1812");
+
+
+select username from userdb.user where username in (select username from db4.t1);
+
+会使用1张表存储所有的信息吗？ 
+
+
+
+
+
+一、多表查询
+	1.1 复制表
+		1.1.0 命令格式
+			create  table 库名.表名  SQL查询；
+
+		1.1.1 作用1 备份表
+				create database  db4;
+				use db4;
+			create table  user2  select * from userdb.user;
+			show tables;
+			select count(*) from user2;
+			select *  from user2;
+
+		1.1.2 作用2 快速建表
+			use  db4;
+			create table user3  
+			     select  * from  userdb.user where  11 <= 10;
+
+			show  table;
+			select  * from  user3;
+			desc  user3;
+
+	1.2 多表查询介绍
+		将2个或2个以上的表 按某个条件连接起来，从中选取需要的数据
+当多个表中 存在相同意义的字段（字段名可以不同）时，可以通过该字段连接多个表
+
+	休息到 11：30 上课
+
+	1.3 多表查询 命令用法
+	     格式1
+		select  字段名列表 from 表名列表; 笛卡尔集
+						表记录行数相乘的积
+  
+		select  字段名列表 from 表名列表 [where  条件]；
+						只显示表中与条件匹配的记录
+	     例子：
+		create table t1  select username,uid,password 
+		from userdb.user limit 3;
+
+		create table t2 select username,uid,shell,homedir 
+		from userdb.user limit 5;
+
+		select  *  from t1;
+		select  *  from t2;
+
+		select  * from t1,t2;
+		select  * from t1,t2  where  t1.uid = t2.uid ;
+
+		select  * from t1,t2 
+			where  t1.uid = 1  and t2.uid = 1  ;
+
+		select  t1.* , t2.shell , t2.homedir  
+		from t1,t2 
+		   where  t1.uid = 1  and t2.uid = 1 ;  
+
+
+	 格式2  where子查询:把内层查询结果作为外层查询的查询条件
+                select  字段名列表 from 表名  
+                  where  
+                条件 （select  字段名列表 from 表名  where  条件）;
+
+	例子：
+	update userdb.user set age=19 where  id <= 10;
+	update userdb.user set age=36  where  id > 10  and  id  <= 40;
+	
+	select username,age from userdb.user 
+            where age <  (select  avg(age) from  userdb.user ) ;
+	
+	select username from db4.t1 where uid <=2;
+
+	select username from userdb.user 
+          where username in (select username from db4.t1 where uid<= 2 );
+                
+	格式3  左连接 查询条件成立时，以左边的表为主显示查询结果
+		select  字段名列表   from   
+                    表a   left   join  表b   on   条件表达式；
+
+	格式4  右连接 查询条件成立时，以右边的表为主显示查询结果
+		select  字段名列表   from 
+			表a  right join 表b on   条件表达式；
+	例子：
+	create  table  t3  
+		select username,uid,homedir,password from userdb.user 
+		limit 3;	
+
+	create  table  t4 
+		select username,uid,homedir,password from userdb.user 
+		limit 6;
+
+	select  * from t3;
+	select  * from t4;
+
+	select  *  from  t3 left join t4 on t3.uid = t4.uid;
+	select  *  from  t3 right join t4 on t3.uid = t4.uid;
+
+	 		
+二、mysql管理工具
+	2.1 访问数据库服务器的方式有那些？
+	    1 命令连接
+	    2 安装软件，访问软件，连接数据库服务器
+		软件会提供图形界面（开发的图形  或 web页面）
+
+        2.2 在数据库服务器上，部署phpMyAdmin 图形软件
+		]# yum  -y  install httpd  php  php-mysql
+		]# systemctl  start httpd
+		
+		]# tar -zxvf phpMyAdmin-2.11.11-all-languages.tar.gz
+
+	]# mv phpMyAdmin-2.11.11-all-languages  /var/www/html/phpmyadmin
+	]# ]# chown -R apache:apache  /var/www/html/phpmyadmin/
+	]# cd /var/www/html/phpmyadmin/
+		]# cp  config.sample.inc.php config.inc.php
+		]# vim config.inc.php
+ 		  17 $cfg['blowfish_secret'] = 'plj123';
+		  31 $cfg['Servers'][$i]['host'] = 'localhost';
+		:wq
+	打开真机的浏览器访问	
+        http://192.168.4.55/phpmyadmin
+		用户名 root
+		密码   密码
+
+	软件使用 练习 10分钟到 15：55
+
+	休息到 16：10 
+
+三、用户授权与权限撤销
+	3.0 恢复数据库管理员root用户本机登陆密码
+	    ]# systemctl  stop mysqld
+	    ]# vim /etc/my.cnf
+		[mysqld]
+		skip-grant-tables
+		#validate_password_policy=0
+		#validate_password_length=6 
+		:wq
+	    ]# systemctl  start mysqld 
+	    ]# mysql
+		mysql> update mysql.user 
+			  set authentication_string=password("123qqq...A")
+                          where host="localhost" and  user="root";
+		mysql> flush privileges;
+		mysql> exit
+
+	    ]# vim /etc/my.cnf
+                 [mysqld]
+		 #skip-grant-tables
+		 validate_password_policy=0
+		 validate_password_length=6
+		:wq
+		]# systemctl  restart mysqld
+		]# mysql -uroot -p123qqq...A
+		   mysql> show  databases;
+
+	    修改数据库管理员root用户本机登陆密码
+	    ]# mysqladmin  -hlocalhost -uroot -p  password "新密码"
+            Enter password: 输入当前密码
+
+	    ]# mysql  -uroot  -p新密码
+	       mysql>
+
+	3.1 用户授权 : 在数据库服务器上 添加连接用户及设置访问权限
+	3.2 默认那个用户有授权 权限 : 数据库管理员root用户本机登陆 
+            			      才有授权权限
+		
+	3.3 授权记录在那里 ： 授权库 mysql 
+				user   已有的用户及访问权限
+				db     记录已有的用户对数据库的访问权限
+				tables_priv  记录已有的用户对表的访问权限
+				columns_priv  记录已有的用户对字段的访问权限
+	3.4 授权命令的用法
+		mysql> grant 权限列表 on  数据库名 to  用户名@"客户端地址"
+		       identified by "密码" [ with grant option ];
+  
+	3.5 例子
+	    mysql> grant  all  on  *.*  to  mydba@"%" 
+		   identified by "123456" with grant option;	
+
+
+	    mysql> grant select on userdb.user to plj@"localhost" 
+                   identified by "123456";
+
+	3.6 相关命令？
+	     select user();
+	     show grants;
+             select user,host from mysql.user;
+	     show  grants  for 用户名@"客户端地址";
+	     set  password= password(“新密码”);
+	     set password for  用户名@'客户端地址'=passowrd(“新密码”);
+
+
+	3.7 撤销用户权限
+	mysql> revoke  权限列表 on 数据库名 from  用户名@"客户端地址";
+	
+	mysql> revoke GRANT OPTION  on  *.* from mydba@"%";
+
+	mysql> revoke delete,insert on  *.* from mydba@"%";
+
+	mysql> revoke all on  *.* from mydba@"%";	
+
+	mysql> show grants for  mydba@"%";
+
+	3.8 删除授权用户
+	    mysql> drop user  用户名@"客户端地址";
+
+	    mysql> select user,host from  mysql.user where user="mydba";	    
+	    mysql> drop user   mydba@"%";
+
++++++++++++DBA1_DAY05  数据备份与数据恢复++++++++++++++++++++++++++++++
+   相关概念：
+	1 数据备份方式： 
+			物理备份 直接拷贝库或表对应系统文件 
+			逻辑备份 使用备份命令或软件对数据做备份，生成对应的备份文件
+
+	2 数据备份策略：
+			完全备份： 备份所有数据 （ 1张表  、1个库 、1台数据库服务器）
+
+			备份新产生的数据	   
+			差异备份： 备份完全备份后，所有新产生的数据.
+			增量备份 : 备份上次备份后，所有新产生的数据.
+
+      3 数据物理备份 和 数据物理恢复
+        50 : 数据物理备份 
+		]# mkdir  /mybak
+   		]# cp -r /var/lib/mysql  /mybak/mysql.bak
+   		]# ls /mybak
+   		]# tar -zcvf /mybak/mysql.tar.gz  /var/lib/mysql/* 
+   		]# ls /mybak/
+   		]# scp -r /mybak/mysql.bak  root@192.168.4.55:/root/
+	
+	55 : 数据物理恢复
+		]# systemctl status mysqld
+  		]# systemctl stop mysqld
+  		]# rm -rf /var/lib/mysql/*
+		]# ls /var/lib/mysql
+		]# ls /root/mysql.bak/
+		]# cp -r  /root/mysql.bak/*  /var/lib/mysql/
+		]# chown  -R mysql:mysql /var/lib/mysql
+		]# systemctl  start mysqld
+		]# mysql -uroot  -p密码
+
+	物理备份的优点与缺点？
+			 
+一、mysqldump
+	1.1 数据完全备份
+		1.1.1 备份命令用法
+		      ]# mysqldump  --help
+		      ]# man        mysqldump
+		      ]# mysqldump   -uroot    -p 密码    库名  >  路径/xxx.sql
+
+		
+		1.1.2 数据完全恢复命令用法
+		      ]# mysql -uroot  -p密码 [库名]  <  路径/xxx.sql
+		      
+		1.1.3 例子
+		      50 备份数据
+		      ]# mysqldump -uroot -p123qqq...A  -A  > /mybak/mysql-all.sql
+
+		    ]# mysqldump -uroot -p123qqq...A  userdb user  > /mybak/userdb_user.sql
+		      ]# mysqldump -uroot -p123qqq...A  db4  > /mybak/db4.sql
+
+	              ]# mysqldump -uroot -p123qqq...A  -B db4 userdb  > /mybak/twodb.sql	
+		      ]# ls  /mybak/*.sql
+
+		      ]# scp  /mybak/userdb_user.sql   root@192.168.4.52:/root/
+		      ]# scp  /mybak/db4.sql  root@192.168.4.52:/root/
+
+		      ]# scp  /mybak/twodb.sql   root@192.168.4.51:/root/
+		      52 数据恢复 
+		      ]# mysql  -uroot  -p123qqq...A  
+		         mysql> create database  userdb;
+		         mysql> create database  db4;
+		         mysql> exit
+		      ]# mysql  -uroot  -p123qqq...A  userdb  < /root/userdb_user.sql
+		      ]# mysql  -uroot  -p123qqq...A  db4  < /root/db4.sql
+		      ]# mysql  -uroot  -p123qqq...A
+			 mysql> select  * from userdb.user;
+			 mysql> use db4;
+			 mysql> show tables;
+
+		      51 数据恢复
+			 ]# mysql  -uroot  -p123qqq...A  < /root/twodb.sql
+			 ]# mysql  -uroot  -p123qqq...A
+			    mysql> show  databases;
+             使用mysqldump 做数据完全备份与恢复的优点与缺点？
+		 
+
+二、实时增量备份/恢复-----使用mysql服务自带的binlog日志文件实现的
+	2.1 mysql服务binlog日志的管理
+		2.1.1 binlog日志介绍?
+			
+		2.1.2 启用binlog日志
+			]# vim /etc/my.cnf
+			 [mysqld]
+			 server_id=50
+			 log-bin
+			:wq
+			]#  systemctl  restart mysqld
+			]#  cd /var/lib/mysql/
+			]#  ls  *-bin*
+                    		mysql50-bin.000001  mysql50-bin.index
+				      日志文件         索引文件
+
+		2.1.3 自定义binlog日志 存储目录和日志文件名
+			]# vim /etc/my.cnf
+				[mysqld]
+				server_id=50
+				log-bin=/logdir/plj
+				:wq
+			]# mkdir /logdir
+			]# chown mysql  /logdir
+			]# ls -l /logdir/
+			]# ls -ld /logdir/
+			]# systemctl  restart  mysqld
+			]# ls -l /logdir/plj*
+			   plj.000001    plj.index		
+
+		2.1.4 管理binlog日志文件
+			1 手动创建新的日志文件
+				]# systemctl  restart mysqld
+				]# mysqldump  -uroot  -p123qqq...A  --flush-logs db5 > /mybak/db5.sql
+				]# mysql  -uroot  -p123qqq...A  -e "flush logs"				
+				mysql> flush logs;
+
+			2 删除已有的日志文件
+				mysql> show master status; 显示正在使用日志文件信息
+				mysql> purge  master  logs  to "plj.000005";
+				mysql> reset master;
+				
+		2.1.5 查看日志文件内容
+			2.1.5.1 查看日志文件内容命令
+				]# mysqlbinlog  [选项]  binlog日志文件名
+				]# mysqlbinlog  /logdir/plj.000001
+
+				常用选项
+				--start-datetime="yyyy-mm-dd hh:mm:ss"
+				--stop-datetime="yyyy-mm-dd hh:mm:ss"
+				--start-position=数字
+				--stop-position=数字
+	休息到 15：15
+
+			2.1.5.2 日志记录sql命令格式
+ 			查看
+				mysql> show variables like "binlog_format";
+					+---------------+-------+
+					| Variable_name | Value |
+					+---------------+-------+
+					| binlog_format | ROW   |
+					+---------------+-------+
+			修改
+				]# vim /etc/my.cnf
+					[mysqld]
+						server_id=50
+						log-bin=/logdir/plj
+						binlog_format="mixed"
+				:wq
+				]# systemctl  restart  mysqld
+
+  				]# mysql  -uroot  -p123qqq...A
+				mysql> show variables like "binlog_format";
+				mysql> reset  master;
+				mysql> show  master status;
+				mysql> show  databases;
+				mysql> create  database bbsdb;
+			mysql> create table  bbsdb.user(name char(10),password char(6));
+			mysql> desc bbsdb.user;
+			mysql> select  * from bbsdb.user;
+			mysql> insert into  bbsdb.user values("bob","abc123");
+			mysql> insert into  bbsdb.user values("tom","123123");
+			mysql> insert into  bbsdb.user values("jim","654321");
+
+			]# mysqlbinlog  /logdir/plj.000001 | grep -i create
+			]# mysqlbinlog  /logdir/plj.000001 | grep -i select
+			]# mysqlbinlog  /logdir/plj.000001 | grep -i desc
+			]# mysqlbinlog  /logdir/plj.000001 | grep -i insert
+	
+			2.1.5.3 日志记录sql命令方式
+					时间点：记录命令执行的时间
+					偏移量：记录命令的长度
+
+
+	2.2 使用binlog日志恢复数据
+		  2.2.1 命令用法
+			]# mysqlbinlog [选项] 日志文件 | mysql -uroot -p密码
+
+		  2.2.1 例子
+			50 ：
+			    ]# scp  plj.000001  root@192.168.4.52:/root/
+
+			52:
+			    ]# mysqlbinlog  /root/plj.000001   | mysql -uroot -p123qqq...A
+			    ]# mysql -uroot -p123qqq...A
+			    mysql> show databases;
+			    mysql> select  * from bbsdb.user;
+
+			50: 读日志指定范围的sql命令， 恢复数据
+			  
+			mysql> insert into  bbsdb.user values("tom","123123");
+			mysql> insert into  bbsdb.user values("jim","654321");
+			mysql> select  * from bbsdb.user;
+			mysql> delete from bbsdb.user where name in ("jack","alice");
+			mysql> select  * from bbsdb.user;
+
+			]# mysqlbinlog  --start-position=1517 --stop-position=1955 \
+                               /root/plj.000001 | mysql  -uroot  -p123qqq...A
+
+			mysql> select  * from bbsdb.user; 
+			
+			休息15分钟 练习 15分钟 到  16：40 讲新课
+
+三、innobackupex
+	3.1 软件介绍 ？ 
+
+	3.2 安装软件
+		]# yum  -y  install libev-4.15-1.el6.rf.x86_64.rpm
+		]# yum  -y  install percona-xtrabackup-24-2.4.7-1.el7.x86_64.rpm
+   		]# innobackupex --help
+   		]# man innobackupex
+
+	3.3 命令用法 
+		]# innobackupex  <选项>
+		选项说明？		
+		--user   --password  --no-timestamp 
+
+	3.4 数据备份与恢复
+		3.4.1 数据完全备份与恢复
+			1 备份数据
+				]# innobackupex  --user root  --password 123qqq...A  \
+			   	   /allbak  --no-timestamp
+
+				]# ls  /allbak
+
+			2 恢复恢复			
+				2.1 准备恢复数据
+				2.2 把备份文件拷贝到数据库目录下
+				2.3 修改目录的所有者和组为mysql用户
+				2.4 启动服务
+				2.5 管理员登陆查看数据
+				]# systemctl  stop  mysqld
+				]# rm  -rf /var/lib/mysql/*
+   				]# innobackupex  --apply-log  /allbak
+   				]# innobackupex  --copy-back /allbak
+				]# chown  -R mysql:mysql /var/lib/mysql
+				]# systemctl  start  mysqld
+				]# mysql -uroot -p123qqq...A
+				   mysql> show database;
+				   mysql> select  * from  db5.a;
+
+		3.4.2 数据增量备份与恢复
+1 增量备份
+		第1次备份所有的数据 （完全备份）
+		]# innobackupex --user root --password 123qqq...A  /fullbak --no-timestamp
+		]# ls /fullbak/
+		mysql> insert into  db5.a values(88); 写10条				
+		
+		第2次备份新产生的数据 （增量备份）
+		]# innobackupex --user root --password 123qqq...A  --incremental /new1dir \
+		   --incremental-basedir=/fullbak  --no-timestamp
+		]# ls /new1dir/
+
+		mysql> insert into  db5.a values(77); 写10条
+		
+		第3次备份新产生的数据 （增量备份）
+		]# innobackupex --user root --password 123qqq...A  --incremental /new2dir \                   --incremental-basedir=/new1dir  --no-timestamp		
+	
+		]# ls /new2dir		
+
+					2 增量恢复 
+ 
+		3.4.3 从完全备份数据里恢复单张表
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

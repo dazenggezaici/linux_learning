@@ -1,0 +1,70 @@
++++++++++++++++++++++++++++++++++++++++++++++++++++
+在数据库服务器192.168.4.58上做如下练习
+把/etc/passwd文件的内容存储到userdb库下的user表里，并做如下配置：
+
+6 在用户名字段下方添加s_year字段 存放出生年份 默认值是1990
+7 在用户名字段下方添加字段名sex 字段值只能是gril 或boy 默认值是 boy
+8 在sex字段下方添加 age字段  存放年龄 不允许输入负数。默认值 是 21
+9 把id字段值是10到50之间的用户的性别修改为 girl
+update
+
+10 统计性别是girl的用户有多少个。
+12 查看性别是girl用户里 uid号 最大的用户名 叫什么。
+select username,sex,uid from passwd where uid in (select max(uid) from passwd where sex="gril");
+
+13 添加一条新记录只给name、uid 字段赋值 值为rtestd  1000
+   添加一条新记录只给name、uid 字段赋值 值为rtest2d   2000
+14 显示uid 是四位数的用户的用户名和uid值。
+15 显示名字是以字母r 开头 且是以字母d结尾的用户名和uid。 
+16  查看是否有 名字以字母a开头 并且是 以字母c结尾的用户。 
+8  把gid  在100到500间用户的家目录修改为/root
+9  把用户是  root 、 bin 、  sync 用户的shell 修改为  /sbin/nologin
+10   查看  gid 小于10的用户 都使用那些shell
+12   删除  名字以字母d开头的用户。
+delete from passwd where username like "d%";
+13   查询  gid 最大的前5个用户 使用的 shell
+select username,gid,Interpreter from passwd order by gid desc limit 5;
+
+14   查看那些用户没有家目录
+select username,homedir from passwd where homedir is null;
+
+15  把gid号最小的前5个用户信息保存到/mybak/min5.txt文件里。 
+select * from passwd order by gid limit 5 into outfile "/mydata/min5.txt" fields terminated by "#" lines terminated by "\n";
+
+    使用useradd 命令添加登录系统的用户 名为lucy 
+16  把lucy用户的信息 添加到user1表里
+
+17  删除表中的 comment 字段 
+alter table passwd drop comment;
+
+18  设置表中所有字段值不允许为空
+
+19  删除root 用户家目录字段的值
+20  显示 gid 大于500的用户的用户名 家目录和使用的shell
+21  删除uid大于100的用户记录
+22  显示uid号在10到30区间的用户有多少个。
+23  显示uid号是100以内的用户使用shell的类型。
+24  显示uid号最小的前10个用户的信息。
+25  显示表中第10条到第15条记录
+select id from passwd limit 10,5;
+
+26  显示uid号小于50且名字里有字母a  用户的详细信息
+select * from passwd where uid<50 having username like "%a%";
+
+27  只显示用户 root   bin   daemon  3个用户的详细信息。
+28  显示除root用户之外所有用户的详细信息。
+29  统计username 字段有多少条记录
+30  显示名字里含字母c  用户的详细信息
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+31  在sex字段下方添加名为pay的字段，用来存储工资，默认值    是5000.00
+32  把所有女孩的工资修改为10000
+33  把root用户的工资修改为30000
+    给adm用户涨500元工资
+34  查看所有用户的名字和工资
+35  查看工资字段的平均值
+36  查看工资字段值小于平均工资的用户 是谁。
+      查看女生里谁的uid号最大
+select username,sex,uid from passwd where sex="gril" order by uid desc limit 1;
+
+38  查看bin用户的uid gid 字段的值 及 这2个字段相加的和  
+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++

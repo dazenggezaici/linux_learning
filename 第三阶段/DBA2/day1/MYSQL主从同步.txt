@@ -1,0 +1,87 @@
+MYSQL主从同步:
+	原理：
+		客户端访问主服务器，主服务器开启binlog日志，从服务器获取主服务器binlog日志，
+		通过日志查看执行命令，在从服务器上再执行一遍，达到备份数据的效果，该过程为实时同步
+
+主服务器：
+	启用binlog日志，授权用户,查看当前正在使用的binlog日志
+	1、vim /etc/my.cnf
+		[mysqld]
+		server_id=51
+		log-bin=master51  # 开启binlog日志，规定文件命名，默认存放路径为/var/lib/mysql/目录下
+		systemctl restart mysqld
+	2、mysql> grant replication slave on *.* to slave@"%" identified by "123qqq...A";  # 给从服务器授权用户
+	3、mysql> show master status;
+
+从服务器：
+	指定server_id，指定主库(服务器)信息
+	1、vim /etc/my.cnf
+		[mysqld]
+		server_id=52  # 指定服务ID
+		systemctl restart mysqld
+	2、mysql> change master to 
+    -> master_host="192.168.4.51",
+    -> master_user="slave",
+    -> master_password="123qqq...A",
+    -> master_log_file="master51.000001",
+    -> master_log_pos=438;
+		mysql> start slave;  # 启动服务
+	3、查看slave服务状态
+		mysql> show slave status\G;
+		# 查看从库配置文件
+		cat /var/lib/mysql/master.info
+
+测试主从同步配置：
+	1、在主库51上添加访问数据的连接用户
+	mysql> grant all on db6.* to client@"%" identified by "123qqq...A";
+	2、客户端50连接主库51存储数据
+	mysql> xxxxx  # 在客户端连接主库创建数据
+	3、查看52数据库，检查是否有主库的数据
+
+将从服务器还原成独立的数据库：
+	1、删除/var/lib/mysql/目录下的：
+		rm -rf master.info  # 配置文件
+		rm -rf relay-log.info  # 日志配置文件
+		rm -rf mysql52-relay-bin.*  # 这里包括了主服务器的日志和日志索引
+	2、重启mysql服务：
+		systemctl restart mysqld
+	3、验证是否还原：
+		show slave status;  # 输出为0则说明还原成功
+
+主从从结构：
+	主-从1-从2：
+		其他配置都一样，只需要在从1的/etc/my.cnf加上log_slave_updates这条指令即可
+
+主从同步/etc/my.cnf常用配置项：
+	Replicate_Do_DB  # 从配置项
+	Replicate_Ignore_DB  # 从配置项
+	Binlog_Do_DB  # 主配置项
+	Binlog_Ignore_DB  # 主配置项
+
+半同步复制模式：
+	主从同步默认模式为：
+		异步复制：
+			缺点：主库接受客户端操作请求，当数据写入主数据库后返回执行正确结果给客户端，
+				不检测从库是否已经写入数据
+	半同步复制：
+		保证至少有一台从库数据与主库同时写入并确认写入成功
+	开启半同步复制：
+	1、加载主库模块：
+		install plugin rpl_semi_sync_master soname "semisync_master.so";
+	2、设置模块并生效：
+		set global rpl_semi_sync_master_enabled=1
+		# 从服务器加载与配置只需要将master改为slave即可，上述两条命令一共有3处需要修改
+	3、查看是否加载成功：
+		select plugin_name,plugin_status from information_schema.plugins where plugin_name like "rpl_semi_sync%";  # ACTIVE表示加载成功
+	4、查看是否设置成功并生效：
+		show variables like "rpl_semi_sync%_enabled";  # ON表示已生效
+	5、以上设置都为临时设置
+	6、半同步复制永久生效方法：
+		修改/etc/my.cnf
+			[mysqld]  # 从服务器只需将master改为slave
+			plugin-load="rpl_semi_sync_master=semisync_master.so"
+			rpl-semi-sync-master-enabled = 1
+		重启服务：
+			systemctl restart mysqld
+
+

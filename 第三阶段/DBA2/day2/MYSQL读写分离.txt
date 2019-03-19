@@ -1,0 +1,145 @@
+MYSQL读写分离：
+	主库服务器--从库服务器--代理服务器
+	
+	主-从 服务器配置主从同步
+	代理服务器(mysql中间件)：
+		需要软件包：  # 在soft/mysql/包里
+			maxscale-2.1.2-1.rhel.7.x86_64.rpm
+		修改配置文件：  # 有#号的地方才需要修改
+			vim /etc/maxscale.cnf  # 以下配置可直接用于配置文件
+				[maxscale]
+				threads=auto  # 产生线程个数：自动模式
+				[server1]  # 服务器1，主数据库服务器
+				type=server
+				address=192.168.4.51  # 对应数据库服务器IP
+				port=3306
+				protocol=MySQLBackend
+				[server2]  # 服务器2，从数据库服务器
+				type=server
+				address=192.168.4.52  # 对应数据库服务器IP
+				port=3306
+				protocol=MySQLBackend
+				[MySQL Monitor]
+				type=monitor
+				module=mysqlmon
+				servers=server1, server2  # 定义需要监控的服务器
+				user=monitoruser  # 监控时服务器授权的用户
+				passwd=123qqq...A  # 密码
+				monitor_interval=10000
+				#[Read-Only Service]  # 将[Read-Only Service]该选项下的所有配置注释
+				#type=service
+				#router=readconnroute
+				#servers=server1
+				#user=myuser
+				#passwd=mypwd
+				#router_options=slave
+				[Read-Write Service]
+				type=service
+				router=readwritesplit
+				servers=server1, server2  # 定义读写分离服务器
+				user=scaluser  # 路由用户，用于查询读写使用的用户是否有授权
+				passwd=123qqq...A  # 路由用户密码
+				max_slave_connections=100%
+				#[Read-Only Listener]  # 该选项以下配置全部注释
+				#type=listener
+				#service=Read-Only Service
+				#protocol=MySQLClient
+				#port=4008
+				[MaxAdmin Service]
+				type=service
+				router=cli
+				[Read-Write Listener]  # 定义读写服务，已默认定义，无需修改
+				type=listener
+				service=Read-Write Service
+				protocol=MySQLClient
+				port=4006
+				[MaxAdmin Listener]
+				type=listener
+				service=MaxAdmin Service
+				protocol=maxscaled
+				socket=default
+				port=4016  # 自定义管理端口，要确认定义端口不被占用
+				
+		在主从服务器授权配置文件中提到的用户monitoruser和scaluser:
+			由于主从服务器已配置主从同步，所已只需要在主数据库服务器上授权用户即可
+			mysql> grant replication slave, replication client on *.* to
+			> monitoruser@"%" identified by "123qqq...A";
+			# 配置监控用户
+			mysql> grant select on mysql.* to scaluser@"%"
+			> identified by "123qqq...A";  # 授权路由用户
+			# 查看授权情况：
+				mysql> select host,user from mysql.user
+				> where user in ("monitor","scaluser");
+			# 创建访问数据的用户：
+				mysql>grant all on *.* to todd@"%" identified by "123qqq...A";
+		启动maxscale服务：
+			maxscale -f /etc/maxscale.cnf  # 启动服务，指定配置文件
+			ss -antlp | grep maxscale  # 确认服务启动，上面定义了4006和4016端口要有
+		进入管理界面：
+			maxadmin -uadmin -pmariadb -P4016
+		查看服务端情况：
+			MaxScale> list servers
+		在客户端上用mysql连接代理服务器：
+			mysql -h192.168.4.57 -P4006 -utodd -p123qqq...A
+			mysql> insert into t3 values(3);
+			# 在客户端插入一条新数据，主库服务器执行插入，从库也可以同步数据
+			从mysql> insert into t3 values(4);
+			# 从库用root用户插入一条新纪录"4",主库无法查询到该记录，
+				但由于读写分离，查询是读操作，则客户端在查询时是查询从数据库服务器，
+				所以可以查询到"4"这条记录
+
+MSYQL多实例：
+	软件包：mysql-5.7.20-linux-glibc2.12-x86_64
+	练习里直接解压压缩包，解压完后直接移动到/usr/local/目录下，直接可以使用
+	mv mysql-5.7.20-linux-glibc2.12-x86_64/ /usr/local/mysql/
+	修改配置文件：
+		vim /etc/my.cnf  # 如果之前安装了mysql和mariadb请先卸载并删除配置文件
+			[mysqld_multi]
+			mysqld = /usr/local/mysql/bin/mysqld_safe
+			mysqladmin = /usr/local/mysql/bin/mysqladmin
+			user = root
+
+			[mysqld1]
+			datadir = /dir1
+			socket = /dir1/mysqld.sock
+			pid-file = /dir1/mysqld.pid
+			port = 3307
+			log-error = /dir1/mysqld.err
+
+			[mysqld2]
+			datadir = /dir2
+			socket = /dir2/mysqld.sock
+			pid-file = /dir2/mysqld.pid
+			port = 3308
+			log-error = /dir2/mysqld.err
+	需要将主目录的所有者和所属组都改为mysql，没有mysql用户就创建一个：
+		chown mysql:mysql /dir1 /dir2
+	/usr/local/mysql/bin/mysqld --user=mysql --basedir=/usr/local/mysql 
+		--datadir=/dir1 --initialize  # 在初始化时会生成第一次登录用的初始密码
+	# 使用安装目录下的bin下的mysqld初始化数据库
+	/usr/local/mysql/bin/mysqld_multi start 1  # 启动编号为1的数据库
+	ss -antlp | grep 3307  # 确认启动成功
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
