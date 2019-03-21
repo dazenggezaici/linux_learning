@@ -1,0 +1,114 @@
+MHA集群：
+	准备工作,主机51-56
+	56主机为管理服务器
+
+所有主机都可以相互免密登录
+51主机为主服务器，52-55为51的从服务器
+52和53服务器作备用主服务器
+所以51，52，53都需要开启binlog日志
+
+将自动删除日志的功能取消：  # 主机51-55
+	vim /etc/my.cnf
+		[mysqld]
+		relay_log_purge=off
+
+将同步模式改为半同步复制模式：
+	由于51，52，53都有可能成为主服务器或从服务器，所以51，52，53都需要同时加载主、从的半同步复制模块并启用
+	vim /etc/my.cnf
+		[mysqld]
+		plugin-load="rpl_semi_sync_master=semisync_master.so;rpl_semi_sync_slave=semisync_slave.so"
+		rpl-semi-sync-master-enabled = 1
+		rpl-semi-sync-slave-enabled = 1
+	54,55主机只需要加载从的半同步复制模块即可
+	vim /etc/my.cnf
+		[mysqld]
+		plugin-load="rpl_semi_sync_slave=semisync_slave.so"
+		rpl-semi-sync-slave-enabled = 1
+
+配置管理主机56：
+	yum -y install perl*  # 因为MHA集群工具是用perl语言写的，所以要把所有有关perl的包全部装上
+	cd ./soft/mysql/mha-soft-student/  # 进到安装包目录
+		yum -y install ./perl*.rpm  # 该目录下的rpm包是系统不自带的，也需要全部安装
+		yum -y install ./mha4mysql-node-0.56-0.el6.noarch.rpm  # 安装该包
+		tar -xf mha4mysql-manager-0.56.tar.gz  # 解压管理软件包
+		cd mha4mysql-manager-0.56/
+			perl Makefile.PL  # 用perl执行配置文件
+			make && make install # 编译安装
+		# 在命令行输入masterha_+TAB可以出现好几条指令说明安装成功
+	mkdir /etc/mha_manager  # 创建工作目录
+	cp ./mha4mysql-manager-0.56/samples/conf/app1.cnf /etc/mha_manager/  # 将源码包中自带的配置模板文件拷贝到工作目录下
+	vim /etc/mha_manager/app1.cnf
+		manager_workdir=/etc/mha_manager  # 指定工作目录
+		manager_log=/etc/mha_manager/manager.log  # 指定日志存放目录
+		master_ip_failover_script=/etc/mha_manager/master_ip_failover  # 指定主库故障切换脚本
+		ssh_user=root  # 指定远程登录的用户和密码
+		ssh_port=22
+		repl_user=slave  # 指定主服务器授权给从服务器同步用的账户和密码
+		repl_password=123qqq...A
+		user=todd  # 用于监控的用户，需要有所有权限且管理主机可以登录，可以是root，但root用户默认只能本地登录
+		password=123qqq...A
+		[server1]
+		hostname=192.168.4.51
+		candidate_master=1  # 参与竞选主库
+		[server2]
+		hostname=192.168.4.52
+		candidate_master=1
+		[server3]
+		hostname=192.168.4.53
+		candidate_master=1
+		[server4]
+		hostname=192.168.4.54
+		no_master=1  # 不参与竞选主库
+		[server5]
+		hostname=192.168.4.55
+		no_master=1
+	cp ./mha-soft-student/master_ip_failover /etc/mha_manager/  # 将配置好的脚本文件拷贝到工作目录下
+		# master_ip_failover该文件需要修改下VIP变量和给该文件赋于X权限
+
+ifconfig eth0:1 192.168.4.100  # 将VIP配置到当前的主数据库服务器，临时配置
+
+
+测试：  # 主机56
+	masterha_check_ssh --conf=/etc/mha_manager/app1.cnf  # 测试ssh连接
+		All SSH connection tests passed successfully.  # 成功提示
+	masterha_check_repl --conf=/etc/mha_manager/app1.cnf  # 测试主从同步
+		MySQL Replication Health is OK.  # 成功提示
+启动服务：
+	masterha_manager --conf=/etc/mha_manager/app1.cnf  # 启动服务
+		[选项]
+		--remove_dead_master_conf  # 删除宕机主库配置
+		--ignore_last_failover  # 忽略xxx.health文件,该文件会记录宕机次数然后做额外的操作
+	masterha_check_status --conf=/etc/mha_manager/app1.cnf  # 查看服务状态
+		app1 (pid:16513) is running(0:PING_OK), master:192.168.4.51
+
+需要在主服务器51上创建client用户并授权对应的权限
+客户端访问：
+	主机50：  # 创建测试数据
+		mysql -h192.168.4.100 -uclient -p123qqq...A  # 此时的4.100是4.51
+		mysql> create database db6;
+		mysql> create table t1(id int);
+		mysql> insert into db6.t1 values(999);
+		mysql -h192.168.4.55 -uclient -p123qqq...A  # 连接到从服务器查看同步情况
+		mysql> select * from db6.t1;
+测试集群高可用：
+	重新启动集群服务并在启动是加上选项：--remove_dead_master_conf --ignore_last_failover
+	停用主库51的数据库服务
+	在停用后几秒，集群服务器会自动停止并触发failover脚本，给新的主数据库配上VIP192.168.4.100，
+		并将51的信息从配置文件/etc/mha_manager/app1.cnf中删除
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

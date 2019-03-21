@@ -119,7 +119,7 @@ MSYQL多实例：
 	# 使用安装目录下的bin下的mysqld初始化数据库
 	/usr/local/mysql/bin/mysqld_multi start 1  # 启动编号为1的数据库
 	ss -antlp | grep 3307  # 确认启动成功
-
+	/usr/local/mysql/bin/mysql -uroot -p'密码' -S /dir2/mysql.sock  # 进入mysqld2数据库
 
 
 

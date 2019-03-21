@@ -1,0 +1,119 @@
+MYSQL视图：
+
+准备测试表：
+表源：/etc/passwd
+导入后在第一列加入id字段，且是主键&自动增长
+
+视图表：
+	虚拟表
+	映射表
+基表=映射=>view表(用户只能查看或操作view表，而不是直接操作基表)
+
+创建视图表：
+create view 名称 as SQL查询;
+create or replace view ...  # 强制创建视图，覆盖当前视图
+create view 名称 as SQL查询 with local check option  # 本地条件检查
+create view 名称 as SQL查询 with check option  # 不指定就是CASCADED
+
+create view v1 as select u2.user as user2,u2.uid as uid2,u2.gid as gid2,u3.user as user3,u3.uid as uid3,u3.homedir as homedir3,u3.shell as shell3 from user2 u2 left join user3 u3 on u2.user=u3.user;  # 字段和表名都可以自定义别名
+
+MYSQL存储过程：  # mysql中的脚本
+创建存储过程：
+	delimiter //  # 将结束符改为//,默认为分号(;)，因为代码中可能出现分号，会影响结束
+	create procedure 库名.存储过程名()
+	begin
+		代码  # 代码就是SQL命令，也需要分号结尾，在调用的时候才会执行
+	end
+	//
+	delimiter ;  # 将结束符改回分号，以上命令都需要在mysql中执行
+调用存储过程：
+	call 存储过程名;  # 调用存储过程（脚本），存储过程名有点类似函数名
+存储过程储存在mysql.proc表里：
+	select * from mysql.proc where name="say1"\G;  # 查看上方创建的存储过程
+存储过程是需要归属的：
+	call mydata.say1;  # 如果当前库不是创建存储过程时的库，调用时需要call 库名.存储过程名;
+删除存储过程：
+	drop procedure 存储过程名;
+	
+全局变量：
+	show global variables;  # 显示所有全局变量
+	# 在启动mysql程序时就定义好的
+会话变量：
+	show session variables;  # 显示所有会话变量
+	set session sort_buffer_size = 40000;  # 修改会话变量sort...size的值
+	# 客户端连接服务器后产生的
+用户变量：
+	set @i=7,@j=8;  # 定义用户变量i,j
+	select @i,@j;  # 查看变量值
+	# 当前服务器用户定义的变量
+局部变量：
+	declare name char(10);  # 定义局部变量name
+	set name="todd";  # 给name变量赋值
+	select name;  # 查看变量name
+	# 在存储过程里定义的变量，且只能在存储过程里使用
+	# 存储过程参数：  # 就是python中函数的参数
+		参数类型： in out inout
+		in 把数据传递给存储过程处理
+		out 接收存储过程的处理结果
+		inout 前两者功能的结合
+		create procedure say4(in user_name char(10))
+		...
+	例：
+		delimiter //
+		create procedure say4(in username char(50))
+		> begin
+		> select user,uid from passwd where user=username;
+		> end//
+		call say4("root")//
+		输出+------+------+
+			| user | uid  |
+			+------+------+
+			| root |    0 |
+			+------+------+
+	例2：
+		create procedure countS(in shell_name char(50),out number int)
+		> begin
+		> select count(user) into number from passwd where shell=shell_name;
+		> end//
+		call countS("/bin/bash",@num)//  # 统计解释器为/bin/bash的用户的个数，并把个数输出给用户变量num
+		select @num//  # 打印用户变量num，即上述解释器为/bin/bash的用户的个数
+		+------+
+		| @num |
+		+------+
+		|    4 |
+		+------+
+	例3：
+		create procedure say6(inout line_num int)
+		> begin
+		> select * from mydata.passwd where id <= line_num;
+		> select count(user) into line_num from mydata.passwd;
+		> end//
+		set @num=3
+		call say6(@num)  # 显示表中id<=3的行，且把表中总用户量赋给num变量
+		select @num  # 显示表中总用户量
+		
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

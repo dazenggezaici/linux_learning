@@ -67,9 +67,9 @@ MYSQL主从同步:
 		保证至少有一台从库数据与主库同时写入并确认写入成功
 	开启半同步复制：
 	1、加载主库模块：
-		install plugin rpl_semi_sync_master soname "semisync_master.so";
+		mysql> install plugin rpl_semi_sync_master soname "semisync_master.so";
 	2、设置模块并生效：
-		set global rpl_semi_sync_master_enabled=1
+		mysql> set global rpl_semi_sync_master_enabled=1
 		# 从服务器加载与配置只需要将master改为slave即可，上述两条命令一共有3处需要修改
 	3、查看是否加载成功：
 		select plugin_name,plugin_status from information_schema.plugins where plugin_name like "rpl_semi_sync%";  # ACTIVE表示加载成功
