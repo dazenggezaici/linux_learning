@@ -11,3 +11,9 @@ alter table 表名 执行动作;
 
 alter table school.restrict add phone varchar(30) not null after name;
 表restrict在name列后加多一列phone
+
+mysql向表中某字段后追加一段字符串:
+update table_name set field=CONCAT(field,'',str)
+
+mysql 向表中某字段前加字符串
+update table_name set field=CONCAT('str',field)

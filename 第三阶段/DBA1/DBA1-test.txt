@@ -10,11 +10,12 @@ update
 
 10 统计性别是girl的用户有多少个。
 12 查看性别是girl用户里 uid号 最大的用户名 叫什么。
-select username,sex,uid from passwd where uid in (select max(uid) from passwd where sex="gril");
+select username,sex,uid from passwd where uid in (select max(uid) from passwd where sex="gril");  #这种对大值尽量不用limit因为最大值可能有相同的
 
 13 添加一条新记录只给name、uid 字段赋值 值为rtestd  1000
    添加一条新记录只给name、uid 字段赋值 值为rtest2d   2000
 14 显示uid 是四位数的用户的用户名和uid值。
+regexp '^.{4}$',like '____'
 15 显示名字是以字母r 开头 且是以字母d结尾的用户名和uid。 
 16  查看是否有 名字以字母a开头 并且是 以字母c结尾的用户。 
 8  把gid  在100到500间用户的家目录修改为/root

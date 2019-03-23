@@ -1,0 +1,65 @@
+修改允许最大连接数：
+	set global max_connections=200;  # 设置最大连接数为200，临时配置
+	vim /etc/my.cnf
+		[mysqld]
+		max_connections=200  # 写在配置文件为永久设置，需要重启服务
+		最大连接数如何设置最佳：
+			最大连接数=曾经有过的最大连接数/0.85
+查询曾经有过的最大连接数：
+	show global status like "Max_used_connections";
+超时时间
+	连接超时时间：
+		show global variables like "connect_timeout";
+	等待断开连接时间：
+		wait_timeout
+给索引查询的缓存大小：
+	key_buffer_size  # 主用于myisam引擎
+给索引线程的缓存大小：
+	sort_buffer_size
+为顺序读表记录保留的缓存大小：
+	read_buffer_size
+允许被重用的线程缓存数量：
+	thread_cache_size
+表打开缓存：
+	table_open_cache  # 能打开多上张表的缓存数量
+
+mysql查询优化：
+开启查询日志：
+	vim /etc/my.cnf  # 开启记录查询日志
+		[mysqld]
+		general-log
+		重启系统后日志文件为：
+			/var/lib/mysql/主机名.log
+	启动慢查询日志：
+		[mysqld]
+		slow-query-log
+		日志文件：
+			/var/lib/mysql/主机名-slow.log
+			# 记录查询超过10秒的记录且没有设置过索引，可以用select sleep(12);测试
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
