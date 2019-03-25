@@ -1,0 +1,105 @@
+RDBMS：
+	关系数据库管理系统
+NoSQL：
+	泛指非关系型数据库
+	主流软件：
+		Redis
+		MongoDB
+		Memcached
+
+Redis部署：
+	安装：  # 使用的是50主机
+		redis-xxx.tar.gz  # 需要提前准备该源码包
+		yum -y install gcc  # 由于是安装源码包，需要提前安装gcc
+		tar -xf ./redis-4.0.8.tar.gz
+		cd redis-4.0.8/
+		make & make install  # 由于该包已提供Makefile，所以不用再执行./configure
+	初始化设置：  # 50
+		./utils/install_server.sh  # 在安装包目录下执行
+			# 所有选项都为默认即可
+	Redis服务启动&停止：
+		/etc/init.d/redis_6379 start  # 启动
+		/etc/init.d/redis_6379 stop  # 停止,如果修改过配置参数，也需要在该文件修改参数
+		redis-cli -a 123qqq...A shutdown  # 有密码停止服务
+	连接Redis服务：
+		redis-cli  # 本机连接服务不需要加选项
+			# 进入交互式界面
+	交互式操作Redis存储数据：
+	redis-cli：  # 默认进入编号为0的库
+		> set name todd  # 存数据格式： set key value
+		> get name  # 取数据： get key 就可以得到value
+		> expire 键 时间  # 设置键(变量)的过期时间，单位 秒
+		> ttl 键  # 查看过期时间，-1为永不过期，-2为已过期或不存在键
+		> keys *  # 查看所有存在的key，星号(*)可以改为问号(?)表示匹配一个字符
+		> select 数据库编号  # 用于切换数据库，编号范围0~15
+		> type 键  # 查看键的类型，默认用set设置的都为字符类型
+		> move 键 库编号  # 将指定的key移动到别的库中
+		> save  # 将所有key和对应的value储存到硬盘中
+		> shutdown  # 停止redis服务
+	默认配置文件/etc/redis/6379.conf：  # 修改50主机redis配置
+		行号	配置选项	配置参数
+		93		port		6350
+		70 		bind 		192.168.4.50
+		501		requirepass	123456  # 默认该行为注释不开启密码认证
+
+Redis+LNMP：
+	配置Nginx，安装于php有关的包
+	vim ./nginx/conf/nginx.conf：  # 配置解释php语言
+		location ~ \.php$ {
+		    root           html;
+		    fastcgi_pass   127.0.0.1:9000;
+		    fastcgi_index  index.php;
+		    include        fastcgi.conf;
+		}
+	vim ./nginx/html/hellp.php  # 编写测试代码
+		<?php
+			echo "Hello,world!"
+		?>
+	安装mysql
+	配置PHP支持Redis：
+		yum -y install php
+		yum -y install php-devel-*  # 安装依赖包，该包在./soft/redis/lnmp/
+		tar -xf php-redis-2.2.4.tar.gz  # 该包在./soft/redis/lnmp/
+		cd phpredis-2.2.4/  # 进入刚刚解压包的路径下
+		phpize  # 执行该指令，该执行需要提前安装php包
+		# 执行完上条命令后在当前目录会生成configure文件
+		./configure --with-php-config=/usr/bin/php-config
+		make && make install  # 配置编译安装
+		ls /usr/lib64/php/modules/
+			redis.so  # 安装完后会在/usr/lib64/php/modules/目录下生成对应模块
+		vim /etc/php.ini  # 配置加载模块
+			extension_dir = "/usr/lib64/php/modules/"  # 在729行附近
+			extension = "redis.so"
+		systemctl restart php-fpm
+		php -m | grep redis  # 有输出则说明模块加载成功
+		vim ./nginx/html/redis-test.php  # 编写redis测试脚本
+			<?php
+			$redis=new redis();
+			$redis->connect("192.168.4.50",6350);
+			$redis->auth("123qqq...A");
+			$redis->set("school","tarena");
+			echo $redis->get("school");
+			?>
+		curl http://192.168.4.50/redis-test.php
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
