@@ -1,0 +1,91 @@
+Redis集群：
+
+启动集群模式：
+	修改配置文件：  # 主机51~56
+	vim /etc/redis/635*.conf
+		815 cluster-enabled yes
+		823 cluster-config-file nodes-635*.conf
+		829 cluster-node-timeout 5000
+		# 815行以后(823,829)，默认均为注释，*表示对应的主机号，51就是1，52就是2
+查看集群信息：
+	> CLUSTER INFO
+	> CLUSTER NODES
+配置管理主机：  # 51即作管理主机和集群主机
+	yum -y install ruby rubygems  # 安装ruby解释器包
+	yum -y install ruby-devel-2.0.0.648-30.el7.x86_64.rpm  # 该包在./soft/redis-cluster/目录下
+	gem install redis-3.2.1.gem  # 该包在./soft/redis-cluster/目录下,且需要用gem命令安装
+	将管理命令拷贝到/root/bin，系统会在该文件夹搜索当作系统命令来用：
+		mkdir /root/bin  # 系统默认不创建
+		cp /root/soft/redis/redis-4.0.8/src/redis-trib.rb /root/bin
+	redis-trib.rb help  # 查看redis集群管理命令的帮助
+创建redis集群：
+	redis-trib.rb create --replicas 1 192.168.4.51:6351 192.168.4.52:6352 192.168.4.53:6353 192.168.4.54:6354 192.168.4.55:6355 192.168.4.56:6356
+	# 创建集群，主机为51-56，--replicas后面的数字是从库的数量，由于一定要有3个主库，所以6台主机的从库数量只能填1，表示三台主库分别单独拥有一个从库
+	> cluster info  # 查看集群信息
+		cluster_state:ok  # ok表示创建成功
+		...
+	> cluster nodes  # 会显示所有主机的信息
+
+redis-cli -c -h 192.168.4.51 -p 6351  # 连接集群, -c 集群模式
+	# 在访问从服务时，会自动切换到该从服务器的对应的主服务器，如cli 54会切换到52
+	# 在创建数据也会随机存到3台主服务器的其中一台
+	# 三台主服务器中的数据都不相同，但取数据在哪台取都可以，会自动切换
+	# 只有主对应的从服务器，这两者的数据才同步才相同
+	# 当主库故障时，对应从库自动切换为主库
+
+向redis集群中添加新主机：
+	添加主库：  # 将主机57添加为主库
+		1、57主机部署redis并开启集群
+		2、redis-trib.rb add-node 192.168.4.57:6357 192.168.4.51:6351
+			# 将57添加到集群中，集群中的任何一台机器都可以代表整个集群所有后面写51-56的IP和端口都可以
+		3、redis-trib.rb reshard 192.168.4.51:6351
+			> 4096  # 用16383除主库的个数等于4096
+			> 57的ID号  # 填入57的ID号，用redis-trib.rb check 192.168.4.51:6351可以查ID号
+			> all  # 从前三个主库的hash槽中提取分配
+			> yes  # 确认该分配
+	添加从库：  # 将主机58添加到集群并作为57的从库
+		1、58主机部署redis并开启集群
+		2、redis-trib.rb add-node --slave 192.168.4.58:6358 192.168.4.51:6351
+			# 默认新添加的从服务器会作为主库中从库最少的主机
+		2、2redis-trib.rb add-node --slave [--master-id 主库的id值] 192.168.4.58:6358 192.168.4.51:6351  # 手动指定跟随的主库
+	查看确认主从关系和主库服务器hash槽值：
+		redis-trib.rb check 192.168.4.51:6351
+
+在Redis集群中移除主机：
+	1、移除主库：  # 主机57
+		a、释放hash槽  # 将数据自动迁移到别的主库服务器上
+			redis-trib.rb reshard 192.168.4.51:635
+				4096  # 指定需要移动的hash槽个数
+				51的ID值  # 需要移动给主机51
+				57的ID值  # 从57的hash槽中获取
+				done  # 没有额外的主机
+				yes  # 确认操作
+		b、移除主机
+			redis-trib.rb del-node 192.168.4.51:6351 8d76a41d4d20ea01836e17d9010b5f4df2dc3762
+			# 指令+选项+集群+需要移除的主机ID
+	2、移除从库：  # 主机58
+		redis-trib.rb del-node 192.168.4.51:6351 b3679abb460e8144e1c42f71681b17d6f9895162
+		# 指令+集群+需要移除的从库的ID，注：51代表的是集群，不是主机，换成52，53都可以
+	3、确认主从主机移除情况：
+		[root@mysql51 ~]# redis-trib.rb info 192.168.4.51:6351
+		192.168.4.51:6351 (d113f7e4...) -> 4 keys | 8192 slots | 1 slaves.  # 57的hash槽给了51，所以51的hash槽有8192个
+		192.168.4.53:6353 (7fbb191a...) -> 1 keys | 4096 slots | 1 slaves.  # 58主机也不存在在该列表
+		192.168.4.52:6352 (b3e1abda...) -> 2 keys | 4096 slots | 1 slaves.
+		[OK] 7 keys in 3 masters.
+		0.00 keys per slot on average.
+
+把故障(手动)移除的redis服务器再添加到集群中：  # 以57主机为例
+	直接再添加会去会报错
+	需要清空已移除主机的集群缓存信息：
+		57> /etc/init.d/redis_6357 start  # 由于移除时会自动停止服务，这里需要重启启动redis服务
+		redis-cli -h 192.168.4.57 -p 6357
+			> cluster reset  # 清除上次集群信息
+			> exit
+	然后再添加即可：
+		redis-trib.rb add-node 192.168.4.57:6357 192.168.4.51:6351
+	检查是否添加成功：
+		redis-trib.rb check 192.168.4.51:6351
+当一组主从都故障了，则集群就无法工作了
+将redis主机恢复为独立的数据库服务器：
+		
+
