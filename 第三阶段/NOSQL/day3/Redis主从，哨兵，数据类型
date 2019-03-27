@@ -1,0 +1,66 @@
+redis主从同步：
+redis服务启动后默认都为主库
+	可以用> info replication来查看是主库还是从库
+		...role:master...
+	设置从库：  # 52主机作为51的从服务器
+		> SLAVEOF 192.168.4.51 6351
+			# slaveof 主库IP 主库端口
+		> info replication
+			...role:slave...
+			# 查看主从信息
+		> slave no one  # 取消从库属性，将主机还原为主库
+		# 在命令行设置均为临时设置，重启服务就会还原
+		修改配置文件，永久有效：
+			vim /etc/redis/63*.conf
+				slaveof 192.168.4.51 6351
+				# 282 slaveof 主库IP 主库端口
+				289 masterauth <master-password>
+				# 如果主库有连接密码，则需要该选项，否则注释即可
+哨兵服务：
+	主库宕机时，从库自动升级为主库
+	监视主从复制结构中的主库运行状态
+	可以部署在除了主库服务器上的所有主机上
+	# 该案例用54主机作为哨兵服务器：
+		1、创建服务的主配置文件
+			vim /etc/sentinel.conf  # 创建并修改sentinel.conf配置文件
+				bind 0.0.0.0  # 在本机所有网卡发出监控信息
+				port 26354  # 本机的26354端口
+				sentinel monitor master0-51 192.168.4.51 6351 1
+				# sentinel monitor 自定义主机名 主库IP 主库发布redis服务的端口
+				sentinel auth-pass master0-51 123qqq...A
+				# 如果主库有密码需要写该选项
+		2、启动哨兵服务
+			redis-sentinel /etc/sentinel.conf
+		3、测试
+			停用51的redis服务
+持久化：
+RDB：
+AOF：
+	RDB的升级版
+	开启AOF功能：  # AOF优先级大于RDB
+		vim /etc/redis/63*.conf
+		673		appendonly yes
+		677		appendfilename "appendonly.aof"
+		/etc/init.d/redis_63* restart
+	开启后写操作都回记录在：
+		/var/lib/redis/63*/appendonly.aof
+		# 以追加的方式记录
+
+Redis数据类型：
+	string
+	list
+	hash
+命令：
+	set
+	strlen  # 统计字符长度
+	setrange  # 修改字符串中的个别字符，命令 key 从几开始 修改为
+	append  # 在字符后追加新值而不是覆盖
+	setbit  # 位存储，当数据只需要有两种状态时，可以用该存储，如是&否
+	bitcount  # 统计位存储变量中1的个数
+	decr  # 自减1，key不存在则赋值0再自减1
+	decrby  # 在key后面可以加自减的数值，decrby key 30,key自减30
+	mget  # 获取key的value，后面可以接多个key
+	getrange  # 字符串切片，命令 key 开始位 结束位
+
+
+
