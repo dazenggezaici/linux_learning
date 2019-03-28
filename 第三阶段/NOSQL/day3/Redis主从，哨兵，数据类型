@@ -45,13 +45,19 @@ AOF：
 	开启后写操作都回记录在：
 		/var/lib/redis/63*/appendonly.aof
 		# 以追加的方式记录
+	安全开启aof:
+		> config set appendonly yes
+		> config rewrite
+	# 这样rdb里的数据就不会丢失
 
 Redis数据类型：
 	string
 	list
 	hash
 命令：
+字符串常用操作：
 	set
+	mset  # 可以同时定义多个变量
 	strlen  # 统计字符长度
 	setrange  # 修改字符串中的个别字符，命令 key 从几开始 修改为
 	append  # 在字符后追加新值而不是覆盖
@@ -61,6 +67,60 @@ Redis数据类型：
 	decrby  # 在key后面可以加自减的数值，decrby key 30,key自减30
 	mget  # 获取key的value，后面可以接多个key
 	getrange  # 字符串切片，命令 key 开始位 结束位
+	incr  # 自加1
+	incrby  # 可自定义自加数值
+	incrbyfloat  # 自加数值可为小数
+list：
+	先进后出
+	lpush key value1 value2 ...  # 如果key已存在则追加写入
+	type key  # 可以查看数据类型
+	lrange key start stop  # 取列表中的值，第一个值的下标是0
+		例：
+		lpush key 1 2 3 4
+		lrange key 0 -1  # 输出时是先进后出
+			4  # 0下标就是最后一个存的值
+			3
+			2
+			1  # -1下标就是第一个存进去的值
+	lpop key  # 删除列表头元素，就是最后存入的值
+	llen  # 获取list的值的个数
+	lindex key index  # 输出列表中的一个值，index填下标
+	lset key index value  # 修改列表中的某个值
+	rpush key value  # 将值插入到列的末尾(就是比第一个插入的还要先插入)
+	rpop key  # 删除队列的最后一个元素
+hash：  # 类似python中的字典
+	hset 变量名 key value  # 定义hash
+	hmset 变量名 key1 value1 key2 value2 ...
+	hget 变量名 key  # 会输出对应key的value 
+	hmget 变量名 key1 key2 ...
+	hkeys 变量名  # 输出所有key
+	hgetall  # 输出所有key-value
+	hvals  # 输出所有value
+	hdel 变量名 key1 key2 ..  # 删除单(多)个key
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

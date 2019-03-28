@@ -1,0 +1,97 @@
+MongoDB：
+	安装：  # 在soft包里
+		tar -xf ./soft/mongodb/mongodb-linux-x86_64-rhel70-3.6.3.tgz
+		目录结构：
+		/usr/local/mongodb/  # mkdir /usr/local/mongodb;cd /usr/local/mongodb/
+		|
+		+bin/  # cp -r mongodb-linux-x86_64-rhel70-3.6.3/bin/ /usr/local/mongodb/
+		|
+		+etc/  # mkdir etc
+		|
+		+log/  # mkdir log
+		|
+		+data/  # mkdir -p data/db
+		|
+		+-db/
+	创建配置文件：
+		vim /usr/local/mongodb/etc/mongodb.conf
+			logpath=/usr/local/mongodb/log/mongodb.log
+			logappend=true
+			dbpath=/usr/local/mongodb/data/db/
+			fork=true
+	启动mongodb服务：
+		/usr/local/mongodb/bin/mongod -f /usr/local/mongodb/etc/mongodb.conf
+		ss -antlp | grep mongod  # 查看是否启动，默认端口为27017
+      /usr/local/mongodb/bin/mongod -f /usr/local/mongodb/etc/mongodb.conf --shutdown  # 停止服务
+    指定端口IP启动：
+    	vim /usr/local/mongodb/etc/mongodb.conf
+    		port=27050
+			bind_ip=192.168.4.50
+		重启服务
+	管理：
+	use db  # 存在db库就进入，不存在就创建并进入该库
+	show dbs  # 显示已有的库
+	db  # 查看当前使用的库
+	show tables  # 显示所有的集合(表)
+	db.t1.save({name:"bob",age:21,mail:"bob@qq.com"})  # 在db库中创建表t1(如果t1已存在则为插入数据)  # 这里的db.xx.xx的db是固定格式，用于查看当前数据库的表
+	db.t1.save({name:"jim",age:21,school:"tarena"})
+	db.t1.save({name:"jack",sex:"boy",tel:"1234567"})  # 同个集合里的文档字段数可以不同
+	db.t1.find()  # 查看t1集合里的所有数据
+	db.t1.count()  # 统计t1集合的记录条数
+	db.t1.findOne()  # 只显示第一条记录
+	db.t1.remove({条件})  # 删除t1中的记录，可以指定条件，不指定就全部删除
+	db.t1.drop()  # 删除t1表
+	基本数字类型：
+		db.t2.save({name:"todd",likes:["film","game","music","eat"]})
+		value可以为数组
+		db.t2.save({lname:"python",script:function(){/*print("Hello,world")*/}})
+		value可以为一段代码
+		db.t2.save({name:"zengge",birth:"1970-01-01",now:new Date()})
+		value可以直接获取当前时间
+		db.t2.save({name:"mark",id:ObjectId()})
+		value可以为对象，就是为主键的意思
+		db.t2.save({gsname:"duoyi",shuxing:{addr:"guangzhou",市值:1000000000,tel:400-888888}})
+		value里可以再内嵌一个字典
+		db.t2.save({功能:"匹配空行",正则:/^$/})
+		value可以是正则,需要在//里
+	导入&导出：
+		入：
+			/usr/local/mongodb/bin/mongoimport [--host 主机IP --port 服务端口] -d 库名 -c 集合名(表名) --type=json /目录/需要导入的文件.json  # 由于是非关系数据库，导入时不需要提前创建对应的库
+			/usr/local/mongodb/bin/mongoimport [--host 主机IP --port 服务端口] -d 库名 -c 集合名(表名) --type=csv [--headerline] [--drop] /目录/需要导入的文件.csv
+			# 如果不使用选项--headerline(将csv文件开头的字段名列表不当作值传进去,一般使用该选项)则需要指定字段[-f 字段名列表],[--drop]覆盖原文件数据，默认是追加到已存在表
+		出：
+			/usr/local/mongodb/bin/mongoexport [--host 主机IP --port 服务端口] -d 库名 -c 集合名(表名) -f 字段1,字段2... --type=csv > /tmp/自定义名称.csv
+			/usr/local/mongodb/bin/mongoexport [--host 主机IP --port 服务端口] -d 库名 -c 集合名(表名) --type=json > /tmp/自定义名称.json  # json不用指定字段,csv格式一定要指定字段名
+		导入系统文件：  # 如/etc/passwd
+			cp /etc/passwd /root/
+			mv passwd passwd.csv
+			sed -i "s/:/,/g" passwd.csv  # 将passwd中的所有的冒号改为逗号
+			sed -i "1iusername,password,uid,gid,comment,homedir,shell" passwd.csv  # 在第一行定义下列值列表的字段，此时该文件格式已经是csv格式规范
+			/usr/local/mongodb/bin/mongoimport --host 192.168.4.50 --port 27050 -d db -c user --type=csv --headerline --drop /root/passwd.csv  # 覆盖导入
+		数据备份&恢复：
+			/usr/local/mongodb/bin/mongodump [--host 主机IP --port 服务端口]  # 如果不指定路径，则会在执行命令的当前目录下创建dump文件夹
+			/usr/local/mongodb/bin/bsondump  # 用于查看.bson结尾的文件内容
+			/usr/local/mongodb/bin/mongodump [--host 主机IP --port 服务端口] -d 库名 -c 集合名 -o /自定义目录/  # 指定备份库，表，且指定导出目录
+			/usr/local/mongodb/bin/mongorestore [--host 主机IP --port 服务端口] [-d 库名] [-c 集合名] /备份目录名/[备份文件名]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
