@@ -1,0 +1,143 @@
+MongoDB副本集(集群)：
+	开启副本集：  # 主机51~53
+		vim ./mongodb/etc/mongodb.conf
+			replSet=rs1  # 文件末尾添加该选项，三台都为rs1
+	重启mongodb服务
+	创建副本集成员列表：  # 连接到交互式界面创建，需要在主库51上执行
+	> config = {
+		_id:"rs1",
+		members:[
+			{_id:0,host:"192.168.4.51:27051"},
+			{_id:1,host:"192.168.4.52:27052"},
+			{_id:2,host:"192.168.4.53:27053"}
+		]
+	}
+	> rs.initiate(config)  # 上方定义config，这里创建副本集，导入参数config，输出结果中"ok":1说明创建成功,可以在local库看到相对应的集群信息
+	# 副本主机52，53开启集群后默认是无法进行操作数据库，需要开启操作权限则需要在对应本机交互式界面输入db.getMongo().setSlaveOk()，生产环境下也是不允许的，实验为了方便才开启
+	查看集群状态：
+		rs.status()  # 可以查看到主副主机结构
+	查看本机是主库?：
+		re.isMaster()
+	故障自动切换：
+		当主库51宕机时，52和53中选举一个作为新的主库服务器，从库上的主库信息也会跟着变化
+		当原主库51修复完启动服务后，会自动成为新主库的从库
+	默认选取主库算法：
+		谁先得到集群最新信息谁当主库
+MongoDB文档管理：
+	查询文档：
+		find()  # 显示所有行
+		findOne()  # 显示第一行
+		find({条件},{定义显示的字段})  # 可以匹配条件
+		find().count()  # 统计文档条目数
+		find().sort()  # 排队
+		find().skip()  # 跳过开头几个
+		find().limit()  # 只显示头几行
+		例：
+			db.user.find({shell:"/sbin/nologin"},{_id:0})  # 条件{字段:0}说明不显示该字段
+			db.user.find({shell:"/sbin/nologin"},{name:1,shell:1})  # 条件{字段:1}只显示字段值为1的值列表，但默认_id就是会显示
+			db.user.find({shell:"/sbin/nologin"},{username:1,shell:1}).limit(3)  # 显示查询结果的前三行
+			db.user.find({shell:"/sbin/nologin"},{username:1,shell:1}).skip(3)  # 跳过(不显示)查询结果的前三行
+			db.user.find({},{_id:0,username:1})  # 只显示用户名，但没指定条件也需要{}
+			db.user.find({},{_id:0,username:1}).sort({uid:1})  # 以uid大小升序排列
+			db.user.find({},{_id:0,username:1}).sort({uid:-1})  # 以uid大小降序排列
+	插入文档：
+		db.user.save()  # 当插入数据的_id有相同时，该字段的其他字段名相同时，字段值则修改为新的
+		db.user.insert()  # 当插入数据的_id相同时，则会报错，放弃修改
+		例：
+			db.user.save({id:1,name:"tom"})  # 创建初始测试数据
+				db.user.save({_id:1,name:"jack"})  # 可以写入
+				db.user.insert({_id:1,name:"pop"})  # 会报错，不允许写入
+		db.user.insertMany([{第一条数据},{第二条数据}])  # 同时插入多条文档
+	更新文档：
+		update({条件},{修改的字段})  # 条件不写就是修改第一条(与条件匹配的第一条)，不写就时全匹配
+		db.myuser.update({},{age:20})  # 只修改第一条文档，且该文档的其他字段全部删除，只剩下age字段，且值为20
+		db.myuser.update({name:"lili"},{lname:"pagk"})  # 匹配name为lili的，将匹配到的第一个文档(数据)内的其他字段全部删除，只剩lname:"pagk"
+		db.myuser.update({lname:"pagk"},{$set:{name:"lili"}},false,true)
+		# 匹配lname:"pagk"的所有匹配到的项,修改该文档的字段name，值该为"lili"
+		db.myuser.update({lname:"pagk"},{$unset:{name:"lili"}},false,true)
+		# 匹配lname:"pagk"的所有匹配到的项,删除该文档的字段name，值该为"lili"
+	
+	删除文档：
+		remove({条件})  # 不加条件就是删除所有记录
+		db.myuser.remove({})  # 删除myuser中的所有文档，内部索引还存在
+		db.myuser.drop()  # 删除myuser表，内部结构和索引全删除
+	逻辑符号：
+		条件1,条件2  # 默认用逗号间隔是逻辑与
+		$or  # 逻辑或，用法如：db.myuser.find({$or:[{条件1},{条件2},{条件3}]})
+		$in  # 在..里，如：db.myuser.find({uid:{$in:[1,3,7]}})，uid为1、3或7的都匹配
+		$nin  # 不在..里，用法同$in
+	数值比较：
+		$gt $gte  # 大于，大于等于，以下同理
+		$lt $lte
+		$ne
+		例：
+			db.myuser.find({_id:{$lte:3}})  # _id小于等于3的列(文档)
+	正则：
+		例：
+			db.myuser.find({name:/^t/})  # name字段值以t开头的匹配
+	匹配空：
+		例：
+			db.myuser.find({name:null})  # 匹配name字段值为空，或在没定义字段name的
+	$inc  # 自增减
+		例：
+			db.myuser.update({条件},{$inc:{字段名:+2}},false,true)  # 将匹配到的所有文档，对应的字段都加2，减2就是把+2改为-2
+	$push  # 主要针对数组类型的文档
+		创建测试数据：
+			db.myuser.save({_id:11,likes:["eat","durk","play","happy"]})
+		例：
+			db.myuser.update({_id:11},{$push:{likes:"look book"}})  # 添加爱好look book，不会影响其他字段和其他字段值，需要匹配_id:11
+	$pop  # 删除数组里的值
+		例：
+			db.myuser.update({_id:11},{$pop:{likes:-1}})  # 删除爱好里的第一个存在(插入)的值，就是数据里的eat
+			db.myuser.update({_id:11},{$pop:{likes:1}})  # 删除爱好里的最后一个值，就是数据里的look book
+	$pull  # 删除数组里的值
+		例：
+			db.myuser.update({_id:11},{$pull:{likes:"play"}})  # 删除指定爱好play
+	$addToSet  # 避免重复添加	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
