@@ -1,0 +1,129 @@
+系统审计：
+	软件包：
+		audit(系统包自带)
+	服务名：
+		auditd
+	主配置文件：
+		/etc/audit/auditd.conf
+			log_file = /var/log/audit/audit.log  # 日志文件路径
+	# 该程序启动后，默认是无法stop的
+	auditctl：  # 命令行下配置规则，马上生效，重启失效
+		auditctl [选项]
+		[选项]：
+			-s  # 查看服务状态
+			-l  # 列出规则
+			-w 路径 -p 审计(权限)规则 -k 规则名  # 插入一条规则，路径可以是文件可以是目录
+			# 例1： auditctl -w /etc/passwd -p wa -k passwd_rule_wa
+			# 例2： auditctl -w /etc/selinux/ -p wa -k selinux_rule_wa
+			# 例3： auditctl -w /usr/sbin/fdisk -p x -k fdisk_rule_x
+			auditctl -l  # 可以将查出的配置项写入到/etc/audit/rule.d/audit.rules末尾即可实现永久生效
+				-w /etc/passwd -p wa -k passwd_rule_wa
+				-w /etc/selinux -p wa -k selinux_rule_wa
+				-w /usr/sbin/fdisk -p x -k fdisk_rule_x  # 只要用fdisk命令就会被记录，因为用命令就是执行命令
+			# 规则‘wa’是写文件，修改文件属性都会被记录，x是执行就记录
+		ausearch [选项]  # 检索日志
+		[选项]：
+			-k 规则名  # 查看对应规则名的日志
+			-i  # 交互式查找
+
+服务安全：
+	网站服务安全：
+		Nginx服务安全：
+			./configure：
+				--with-*是加载模块
+				--without-*禁用模块
+			安全控制：  # nginx优化
+				禁用自动索引模块：
+					--without-http_autoindex_module
+					# 模块演示：
+					# 在nginx配置里的server选项中添加‘autoindex on;’来启动自动索引模块
+					# 在访问网站目录是会把该目录下的所有文件暴露
+					Index of /myweb/
+					../
+					1.html    03-Apr-2019 02:35    4
+					2.html    03-Apr-2019 02:35    4
+					3.html    03-Apr-2019 02:35    4
+					重要文件	 03-Apr-2019 02:35		9999
+					# 在已安装nginx主机上禁用：
+						重新配置，编译再安装，重装前需要停止服务
+				隐藏Nginx版本信息：
+					# 防止攻击者知道版本信息，通过Nginx本身该版本漏洞进行攻击
+					# 需要修改源代码
+					vim +48 ./nginx-*/src/http/ngx_http_header_filter_module.c
+						static u_char ngx_http_server_string[] = "Server: Web" CRLF;
+						static u_char ngx_http_server_full_string[] = "Server: Web" CRLF;
+						static u_char ngx_http_server_build_string[] = "Server: Web" CRLF;
+					# 把有关Nginx的变量删除，在server:后输入自己想要的值
+					# 修改完再配置，编译和安装
+				限制相同主机并发连接数：
+					相关模块：
+						--with-http_limit_req_module  # 默认该模块已加载
+					vim /usr/local/nginx/conf/nginx.conf
+						http{
+						...
+							limit_req_zone $binary_remote_addr zone=one:10m rate=5r/s;
+							# 定义限制规则：内存拿出10m来存储客户端IP地址，rate后是规定处理
+							server{
+							...
+								limit_req zone=one burst=10;
+							}
+						}
+				拒绝非法请求：
+					# 仅允许GET|POST
+					vim /usr/local/nginx/conf/nginx.conf
+						server{
+						...
+							if ($request_method !~ ^(GET|POST)$)
+							{
+									return 444;
+							}
+						}
+				防止buffer溢出：
+					vim /usr/local/nginx/conf/nginx.conf
+						http{
+							client_body_buffer_size  1K;
+							client_header_buffer_size 1k;
+							client_max_body_size 16k;
+							large_client_header_buffers 4 4k;
+						}
+		Tomcat服务安全：
+			# 学习中软件包只需要解压然后移动到/usr/local/tomcat/即可使用
+			隐藏版本信息：
+				# 修改源代码，需要先安装jar命令，包名：java-1.8.0-openjdk-devel
+				cd /usr/local/tomcat/lib
+				jar -xf catalina.jar  # 解压完后才有./org目录
+				vim /usr/local/tomcat/lib/org/apache/catalina/util/ServerInfo.properties
+					server.info=MyWebServer  # 该为自定义即可
+					server.number=9.9.9.9
+					server.built=Jan 1 1970 00:00:00 UTC
+				vim +70 /usr/local/tomcat/conf/server.xml
+					<Connector ...  # 在该选项最后添加server属性
+					... server="MyWebServer" />
+			修改软件目录权限：  # 降权启动服务
+				useradd tomcat
+				chown -R tomcat:tomcat /usr/local/tomcat/
+				su -c "/usr/local/tomcat/bin/startup.sh" tomcat
+				vim /etc/rc.local  # 为了让每次启动都用tomcat用户启动，把他写在开启自动文件里
+				chmod +x /etc/rc.local
+			删除默认测试页：
+				rm -rf /usr/local/tomcat/webapps/*
+		Mariadb数据库服务安全：
+			# 删除匿名用户
+			# 禁用root远程登录
+			# 删除测试数据库
+			# 刷新权限
+			执行mysql_secure_installation命令，根据提示完成即可
+
+Linux安全补丁：
+	vim lnmp.sh  # 第一版
+		#!/bin/bash
+		echo "自动部署LNMP平台"
+		echo "version: v0.1"
+	vim lnmp0.2.sh  # 第二版
+		#!/bin/bash
+		echo "自动部署LNMP平台"
+		echo "version: v0.2"
+		echo "开始部署LNMP......"
+		echo "部署完成！！！"
+	diff -u lnmp.sh lnmp0.2.sh > lnmpv0.2.patch  # 生成补丁文件，-u选项后接的是前版本，再接后一个版本
+
