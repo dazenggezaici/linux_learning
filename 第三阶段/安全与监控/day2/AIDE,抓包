@@ -1,0 +1,74 @@
+数据安全：
+	对称加密与解密：
+		A主机加密：gpg -c 文件名  # 加密后原文件内的内容会给加密
+		B主机解密：gpg -d 文件名
+	非对称加密：
+		rm -rf ~/.gnupg/  # 删除原来的公私钥文件夹
+		gpg --gen-key  # 生成公钥私钥，A主机
+		# 根据需求输入选项
+		ls -a ~/.gnupg/  # 查看生成的公私钥
+		gpg -a --export > /tmp/root.pub  # 查看公钥并写入到文件中，A主机
+		gpg --import root.pub  # 导入公钥，B主机
+		gpg -e -r admin 需加密文件  # 这里的admin是A主机在生成公私钥时输入的用户
+		gpg -d 需要解密的文件 > 1.txt
+	签名与验证签名：
+		gpg -b 文件名  # 对文件进行签名，是用私钥签的名
+		gpg --verify 已签名过的文件  # 对签名文件进行校验，签名文件一般以.sig结尾
+
+AIDE：
+	# 入侵检测系统
+	# 安装软件包yum -y install aide
+	# 配置文件：/etc/aide.conf
+	# 数据库目录：/var/lib/aide
+	# 日志文件目录：/var/log/aide
+	注释初始检测目录：
+		/etc/aide.conf
+		99行~312行需要注释掉,99行后都是对文件或在目录检测的配置
+	自定义检测目录：
+		/root/  FIPSR  # 目录	规则，规则在配置文件上方已经定义
+	初始化检查：
+		aide --init  # 将定义需要检测的文档在没有被访问前，生成初始化信息
+		/var/lib/aide/aide.db.new.gz  # 初始化信息文件一般存放到外部设备而不是本机
+	实验将初始化信息文件移动到/opt下：
+		mv /var/lib/aide/aide.db.new.gz /opt/
+		cp /opt/aide.db.new.gz /var/lib/aide/aide.db.gz  # 因为AIDE默认与aide.db.gz文件名进行对比，所以需要该为该名称
+	修改/root/目录下的文件：
+		mkdir /root/hack/
+		touch /root/hack/hack.hack
+	检查：
+		aide --check  # 会输出修改信息
+
+抓包&扫描：
+
+	扫描工具：
+		Scan  # 主动探测
+		Sniff  # 被动监听
+		Capture  # 数据包捕获
+
+NMAP:  # 网络探测，系统光盘自带
+	# 安装： yum -y install nmap
+	基本使用：
+		nmap [扫描类型] [选项] <扫描目标>
+		nmap -sP -n 192.168.4.1-254  # 扫描192.168.4网段的主机在线情况
+		nmap -A  # 全面扫描
+		nmap -sT  # TCP
+		nmap -sU  # UDP
+
+网络抓包工具：
+	tcpdump & WireShark
+	tcpdump：
+		只抓TCP协议的包和只有命令行操作
+	使用：
+		tcpdump [选项] [过滤条件]  # 默认抓eth0口
+		tcpdump -i enp2s0  # 指定网卡
+		-A  # 显示详细信息
+		-w  # 后面可以接上文件，可以写入进去，文件一般以.cap结尾
+		-r  # 从指定文件中读取信息
+	读：tcpdump -A -r 1.cap
+	过滤条件：
+		
+WireShark：
+	安装：yum -y install wireshark wireshark-gnome
+
+
+

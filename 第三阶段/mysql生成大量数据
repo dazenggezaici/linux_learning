@@ -1,0 +1,22 @@
+CREATE TABLE `km_tbl_companysongfilter_new` (
+`FilterID` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+`CompanyCode` VARCHAR(10) NOT NULL,
+`FilterType` VARCHAR(32) NOT NULL COMMENT '过滤类别',
+`FilterValue` VARCHAR(32) NOT NULL COMMENT '过滤值',
+`CreateDateTime` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '创建时间',
+PRIMARY KEY (`FilterID`)
+) ENGINE=INNODB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8
+
+DELIMITER $$
+CREATE  PROCEDURE add_test_data(IN n INT)  
+BEGIN    
+DECLARE i INT DEFAULT 1;  
+WHILE i <= n  DO  
+INSERT INTO km_tbl_companysongfilter_new  (CompanyCode,FilterType,FilterValue,CreateDateTime ) VALUES (FLOOR(RAND() * 100000),'SongID',FLOOR(RAND() * 100000000) ,NOW());  
+SET i=i+1;      
+END WHILE;  
+END $$
+DELIMITER ;
+
+create PROCEDURE insert_table_data(in n int) BEGIN DECLARE i INT DEFAULT 1; WHILE i <= n  DO  insert into tb1(id) values(null); set i=i+1; END WHILE; end$$
+

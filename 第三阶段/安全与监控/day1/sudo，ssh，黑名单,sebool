@@ -1,0 +1,109 @@
+Linux基本防护
+	1、修改账户过期时间：
+		chage -E 2019/04/30 todd  # 设置todd用户在4月30号过期
+		chage -l todd  # 可以查看用户todd的年龄信息
+		/etc/login.defs  # 该文件定义了创建账户的密码规则
+	2、锁定用户密码：
+		passwd -l 用户名
+		解锁：
+			passwd -u 用户名
+		查看锁定状态：
+			passwd -S 用户名
+	3、tty登录提示信息：
+		/etc/issue  # 本地登录提示信息
+		/etc/issue.new  # 网络远程登录提示信息
+	4、拓展（文件系统挂载额外属性）：
+		/etc/fstab
+			/dev/vda1   /boot    xfs   defaults,noexec   0  0
+			/dev/vda3   /home    xfs   defaults,noatime  0  0
+		注：
+		noexec属性可以让分区下的所有程序都不可执行，包括病毒与木马
+		noatime让分区下的所有文件都不再更新atime时间，atime时间为文件的访问时间
+
+	5、锁定文件：
+		chattr +i 文件名  # +i选项为无法修改、删除等，解锁就是-i
+		chattr +a 文件名  # 锁定后仅可追加写入，解锁为-a
+		lsattr 文件名  # 查看文件特色属性
+
+
+用户sudo授权：
+    vim /etc/sudoers
+        todd    localhost=/usr/bin/yum,/usr/bin/vim /etc/resolv.conf
+        # 格式：用户 主机名=命令或者是命令执行的文件，案例中的vim只能修改resolv文件
+        # 前提是命令都需要是绝对路径
+		# 授权后，授权用户在命令前还需要加sudo执行才能生效
+		# 一定要把(#%wheel ALL=(ALL)	ALL)行注释调，非常不安全
+
+开启sudo授权后用户操作日志：
+    vim /etc/sudoers
+        Defaults logfile="/var/log/sudo"
+
+sudo别名设置，就是把用户或者权限定义为变量名：
+    vim /etc/sudoers
+        Host_Alias MYSER=localhost,mysql50
+        # 定义主机名格式：Host_Alias 别名(必须是大写英文)=主机名1，主机名2，...
+        Cmnd_Alias MYCMD=/usr/bin/rpm,/usr/bin/yum
+        # 定义命令，格式同上，Cmnd_Alias和上面的Host_Alias都是固定格式
+        User_Alias MUSER=todd,tom,bob
+        # 在文件/etc/sudoers上方已经定义了常用的别名，默认注释了，一般不需要自己定义别名
+
+SSH访问控制：
+	SSH基本防护：
+		修改默认端口：
+			vim /etc/ssh/sshd_config
+				port=5422  # 使用非默认端口
+				ListenAddress 192.168.4.50  # 指定只能从4.50网卡连接
+		黑白名单：
+			vim /etc/ssh/sshd_config
+				# 写了白名单后，只有白名单中的用户才可以访问，默认其他用户在黑名单
+				AllowUsers 用户名列表  # 允许用户访问
+				AllowGroups 用户组列表  # 允许组访问
+				# 写了黑名单后，只有黑名单中的用户不可以访问
+				DenyUsers 用户名列表  # 黑名单，黑白名单不共用
+				DenyGroups 用户组列表  # 不允许访问
+		配置仅允许密钥对方式验证登录：
+			# 需要提前配置好无密码登录
+			# 只需要将已经配置好无密码登录的主机上的私钥(id_rsa)复制到需要连接服务器的主机
+			# 254可以无密码登录50，57想无密码登录50，只需要把254上的私钥给57即可
+			vim /etc/ssh/sshd_config
+				PasswordAuthentication no
+
+SELinux安全防护：
+	安全上下文：
+		给文件或者目录打上标签
+		查看安全上下文：
+			ls -lZ 文件名
+			ls -ldZ 目录名
+			ps aux -Z | grep -i 进程名
+	修改安全上下文：
+		chcon [-t(文件),-R(目录)] 安全上下文值(如:httpd_sys_content_t) 文件名
+	恢复安全上下文：
+		restorecon 目录/文件名  # 父目录是什么，该文件就是什么
+
+	getsebool -a  # 查看所有服务的selinux布尔值
+	setsebool [-P(永久生效)] 服务的布尔数 [on/off]  # 开、关
+	# 当不知道需要打开哪个bool值时，可以查看selinux日志，来找到是哪个设置导致服务无法正常运行
+	/var/log/messages  # 没有独立日志文件的服务会把日志信息写到这个文件里
+	grep setroubleshoot /var/log/messages  # 这里显示的就是selinux的日志信息
+		例：修改httpd默认端口后，如该为8070，无法启动程序，查看selinux日志：
+			grep setroubleshoot /var/log/messages
+			Apr  2 09:26:54 mysql57 setroubleshoot: SELinux is preventing
+			/usr/sbin/httpd from name_bind access on the tcp_socket port 8070. 
+			For complete SELinux messages run: sealert -l 876e5e86-f6a8-4234-ae6d-43c93d0ae6dd
+			# 提示让我们运行sealert -l xxxx查看详细信息，输出信息中Do单词后面就是解决办法，如提示的第一条：
+			# semanage port -a -t PORT_TYPE -p tcp 8070
+			# 其中 PORT_TYPE 是以下之一：http_cache_port_t, http_port_t,
+
+
+
+
+
+
+
+
+
+
+
+
+
+
