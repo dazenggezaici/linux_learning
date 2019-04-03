@@ -1,0 +1,58 @@
+自动安装nginx
+id nginx &> /dev/null
+[ $? -ne 0 ]&&useradd -s /sbin/nologin nginx
+nginx -s stop &>/dev/null
+nginx &> /dev/null
+[ $? -eq 0 ]&&echo "您已安装nginx,请勿重复安装！"&&exit
+if [ -f nginx*.tar.gz ];then
+        tar -xf nginx*.tar.gz
+        cd nginx*
+        yum -y install gcc pcre-devel openssl-devel zlib-devel make
+        ./configure
+        make
+        make install
+        ln -s /usr/local/nginx/sbin/nginx /usr/sbin/
+        cd ..
+else
+        echo "没有Nginx源码包"
+        exit
+fi
+
+监控
+	CPU负载：uptime
+		uptime | awk -F: '{print "CPU的负载是"$5}'
+	网卡流量：ifconfig eth0
+		ifconfig eth0 | awk -F[\(\)] '/RX p/{print "RX:"$2}'
+	内存剩余：
+		free -m | awk '/Mem:/{print "内存剩余:"$4"M"}'
+	磁盘剩余：
+		df -h / | awk '/\/$/{print "磁盘剩余"$4}'
+	计算机账户数量
+		num=`cat /etc/passwd | wc -l`
+		echo "计算机用户数量为:$num"
+	当前计算机登陆用户数量
+		who | wc -l
+		echo "当前计算机登陆用户数量为:$num"
+	当前计算机进程数量
+		ps -aux | wc -l
+		...
+	本机已安装的软件包的数量
+		rpm -qa | wc -l
+		...
+		
+编写安全检测脚本
+ssh登陆帐号或密码输错超过3次
+/var/log/secure
+awk '/Failed/{ip[$11]++}END{for(i in ip){print "主机:",i,"登陆失败次数:",ip[i]}}' /var/log/secure
+超过3次就丢到防火墙的block里
+#!/bin/bash
+ip=`awk '/Failed/{ip[$11]++}END{for(i in ip){print i","ip[i]}}' /var/log/secure`
+for i in $ip
+do
+        host=`echo $i | awk -F, '{print $1}'`
+        num=`echo $i | awk -F, '{print $2}'`
+        [ $host == "172.25.0.250" ]&&continue
+        [ $num -ge 3 ]&&firewall-cmd --zone=block --add-source=$host&&echo "已将主机$host隔离"
+done
+
+

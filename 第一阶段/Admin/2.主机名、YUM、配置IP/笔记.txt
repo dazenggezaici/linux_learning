@@ -1,0 +1,86 @@
+环境介绍：
+	--server 用于搭建服务（主）
+	--desktop 用于访问服务器的服务（主）
+	--classroom 提供dhcp服务、DNS等软件数据资源（优先启动，开机就行）
+	登陆服务器：ssh -X root@IP地址（-X 后可以打开图形华界面）
+	
+还原主机命令：
+	rht-vmctl reset 主机名（如：classroom）
+
+为真机设置永久别名：
+	配置文件：/root/.bashrc
+	在该文件中插入 alias 别名='实际命令'
+	然后保存，在新打开的终端中才会生效。
+
+软件包管理（rpm）：
+	1、从虚拟机classroom获得软件包：
+		命令：firefox classroom，就可以查看classroom的数据和内容,
+		前提是classroom虚拟机已开机，并且网络通畅。
+	2、下载软件包：
+		命令：	wget URL。
+			wget URL -O（大写的欧）后面可以加路径/新文件名,如：
+			wget http://xxxxxxx/xxx.xxx -O /home/xxx.xxx。
+	3、安装软件包：
+		命令：	rpm -q 软件名  #查询软件是否安装。
+			rpm -ql 软件名 #查看软件包安装了那些功能，在什么位置。
+			rpm -ivh 软件名+软件版本+系统版本  #安装软件包,实际上-i就可以了。
+			rpm -e 软件包  #卸载软件包。
+	补充（了解就好）：
+		导入红帽签名，在光盘中类似这样的路径rhel7.0/x86_64/dvd/RPM-GPG-KEY-
+		redhat-release。
+		命令：rpm --import xxxx（签名）。
+	rpm的缺点：依赖关系包要‘人’自己解决，非常浪费时间。
+		
+软件包管理2（yum）：
+	1、/etc/yum.repos.d/*.repo ,yum的配置文件（是以.repo结尾的文件）路径。
+	2、为了保险，先把/etc/yum.repos.d/下的文件全删了,是这个路径下的文件，不包括这个路径，命令：
+		rm -rf /etc/yum.repos.d/*
+	3、在/etc/yum.repos.d/路径下新建一个yum.repo,填入内容如下：
+		[rhel7]
+		name=RHEL7.0
+		baseurl=http://classroom.example.com/content/rhel7.0/x86_64/dvd/
+		enabled=1
+		gpgcheck=0
+	--说明：baseurl 填入的是可访问的光盘路径
+		enabled=1 '1'就是生效的意思 '0'就是不生效，gpgcheck同理。
+	4、安装软件包：yum install -y xxxx（包名）
+	5、卸载软件包：yum remove xxxx（包名） 注：尽量不加-y。
+	6、清空yum缓存：yum clean all
+
+升级内核：
+	1、下载新内核软件包，包名如下：
+		kernel-3.10.0-123.1.2.el7.x86_64.rpm类似这样的rpm包。
+	2、安装更新内核：
+		命令：rpm -ivh kernel-xxxxxxx（在更新内核时，一定不能在完成之前结束掉，不能ctrl+c）
+			更新完要重启计算机才能生效，uname -r查看内核是否更新完毕。
+
+配置网络：
+	1、主机名；IP地址、子网掩码、网关；DNS；
+	命令：
+		永久设置主机名：/etc/hostname 新文件写入想改主机名即可
+		网卡配置文件：/etc/sysconfig/network-scripts/ifcfg-eth0
+			也可以通过命令nmcli修改网卡配置,常用命令如下：
+				nmcli connection show显示网卡信息。
+				nmcli connection modify 'System eth0' ipv4.method manual ipv4.addresses '172.25.0.11/24 172.25.0.254' connection.autoconnect yes。
+				/etc/resolv.conf更改dns服务器。
+				nslookup xxx.xxx.xx.xx 测试DNS解析域名
+				route	查看路由表
+		
+
+
+
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
