@@ -126,4 +126,124 @@ Linux安全补丁：
 		echo "开始部署LNMP......"
 		echo "部署完成！！！"
 	diff -u lnmp.sh lnmp0.2.sh > lnmpv0.2.patch  # 生成补丁文件，-u选项后接的是前版本，再接后一个版本
+	
+	给文件夹创建补丁文件：
+		例1：
+			diff -uraN /demo/source1 /demo/source2 > vs1-2.patch
+			# 生成从版本一(source1)升级到版本二(source2)的补丁
+			-u	输出统一内容的头部信息（打补丁使用），计算机知道是哪个文件需要修改
+			-r	递归对比目录中的所有资源（可以对比目录）
+			-a	所有文件视为文本（包括二进制程序）
+			-N	无文件视为空文件（空文件怎么变成第二个文件）
+	版本升级(打补丁)：
+		软件包patch，系统光盘就有
+		格式： patch -pX < 补丁文件
+		[选项]
+			X  # 填入数字，这个数字是说需要去除几层目录
+			如例一，项目demo在/目录下，生成补丁文件时也是用绝对路径，
+			那么在打补丁的时候，如果在/目录下执行patch则X就为1，只需要寻找一层目录
+
+Linux包过滤防火墙：
+	软件包：iptables-services
+	服务名：iptables
+	组成结构：
+		四张表，五条链
+	表：  # 对服务功能分类
+		raw  # 状态跟踪表
+		mangle  # 包标记表
+		nat  # 地址转换表
+		filter  # 过滤表
+	链：  # 数据包的传输方向，以防火墙服务器本机作为参照
+		INPUT  # （入站规则）
+		OUTPUT  # （出站规则）
+		FORWARD  # （转发规则）
+		POSTROUTING  # （路由前规则）不商量执行
+		PREROUTING  # （路由后规则）需商量后执行
+	包过滤匹配流程：
+		规则链内匹配顺序：
+			顺序匹配，匹配即停止（LOG除外：如果规则为记录日志，则还继续匹配下一条规则）
+			规则都不匹配，就按默认规则
+
+	iptables用法解析：
+		iptables [-t 表名] 选项 [链名] [条件] [-j 目标操作]
+	iptbs基本使用：
+		iptables -t filter -I INPUT -p icmp -j REJECT
+		# 插入规则，REJECT为拒绝，-p后面接协议
+		iptables -t filter -L INPUT --line-numbers
+		# 查看规则，--line-numbers在规则前加上数字
+		iptables -t filter -D INPUT 1
+		# 删除第一条规则
+		iptables -t filter -I INPUT -p icmp -j DROP
+		# 插入规则，DROP为丢弃
+		iptables -L  # 不接表名默认查看filter表
+		iptables -L -t 表名  # 查看表的链规则
+		iptables -t filter -A INPUT -p icmp -j DROP  # -A是在末尾插入规则，-I是插入到第一行
+		iptables -t filter -P FORWARD DROP  # 添加默认规则
+
+	主机型防火墙（用于保护防火墙服务器本身）
+		例1：
+			iptables -t filter -A INPUT -s 192.168.4.254 -p tcp --dport 22 -j ACCEPT
+			iptables -t filter -P INPUT DROP
+			# 上面两条指令，仅允许254主机ssh本机，其他主机的所有访问和请求都丢弃
+		例2：
+			iptables -t filter -A INPUT -p tcp --dport 80 -j ACCEPT
+			# 允许其他主机访问本机的http服务80端口
+			iptables -t filter -A INPUT -p tcp --dport 3306 -j ACCEPT
+			# 允许其他主机访问本机的数据库服务
+		例3：  # 允许自己ping被人，其他人不可以ping自己
+		# 由于上面设置了iptables -t filter -P INPUT DROP，默认别人的请求都拒绝
+			iptables -t filter -A INPUT -p icmp --icmp-type echo-reply -j ACCEPT
+			# 接收别人发送的ping回应包echo-reply
+			iptables -t filter -A OUTPUT -p icmp --icmp-type echo-request -j ACCEPT
+			# 允许自己ping的echo-request包发送
+
+	扩展匹配：
+		格式：
+			-m 模块名 [模块选项] 规则范围
+		iptables -t filter -I INPUT 4 -p icmp -m mac --mac-source 52:54:00:48:6b:8b -j DROP
+		# 匹配mac地址
+		iptables -t filter -I INPUT -p tcp -m multiport --dport 22,80,3306 -j ACCEPT
+		# 同时匹配多个端口
+		iptables -t filter -I INPUT 2 -p icmp -m iprange --src-range 192.168.4.52-192.168.4.54 -j DROP
+		# 同时匹配IP段
+
+	网络地址转换：  # SNAT源地址转换
+	实验环境IP，4网段为内网，2网段为公网
+		iptables -t nat -A POSTROUTING -s 192.168.4.0/24 -p tcp --dport 80 -j SNAT --to-source 192.168.2.52
+		# 来自4网段(内网)的tcp80端口请求，转发给本机的192.168.2.52(公网IP)
+		iptables -t nat -A POSTROUTING -s 192.168.4.0/24 -p tcp --dport 80 -o eth0 -j MASQUERADE
+		# 当公网IP不固定时，需要将动作该为MASQUERADE,-o选项可以加，看公网地址在那个网卡上
+
+	网络型防火墙：  # 4网段为内网，2为公网
+	例1：
+		iptables -t filter -P FORWARD DROP  # 把默认经过防火墙服务器的请求改为丢弃
+		iptables -t filter -A FORWARD -p tcp --dport 80 -j ACCEPT
+		# 允许目标地址回80数据包
+		iptables -t filter -A FORWARD -p tcp --sport 80 -j ACCEPT
+		# 允许源地址发送80请求
+		# 让内网主机可以访问公网的web服务
+	例2：
+		iptables -t filter -A FORWARD -p tcp --sport 22 -j ACCEPT
+		iptables -t filter -A FORWARD -p tcp --dport 22 -j ACCEPT
+		# 让公网的主机可以连接(ssh)内网主机
+
+iptables-save >> /etc/sysconfig/iptables
+# 将命令行防火墙配置保存到配置文件，重启配置还生效
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
