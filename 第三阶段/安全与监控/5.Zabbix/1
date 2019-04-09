@@ -1,0 +1,166 @@
+Zabbix:
+	监控服务：192.168.2.5  # 安装Zabbix，还需要配置LNMP环境
+	client1：192.168.2.100  # 监控对象为WEB服务
+	client2：192.168.2.200  # 监控对象为WEB服务
+	web管理页面用的是PHP
+环境搭建：
+	zabbix-server:
+		安装：
+		yum -y install gcc pcre-devel openssl-devel
+		tar -xf /root/soft/Zabbix/lnmp_soft/nginx-1.12.2.tar.gz
+		cd nginx-1.12.2/
+		useradd nginx
+		./configure --user=nginx --group=nginx --with-http_ssl_module
+		make && make install
+		yum -y install mariadb mariadb-devel mariadb-server php php-mysql
+		yum -y localinstall /root/soft/Zabbix/lnmp_soft/php-fpm-5.4.16-42.el7.x86_64.rpm
+		
+		配置：
+			配置nginx的配置文件：
+			http{
+			...
+			fastcgi_buffers 8 16k;  # 缓存php生成的页面内容，8个16k
+			fastcgi_buffer_size 32k;  # 缓存php生产的头部信息
+			fastcgi_connect_timeout 300;  # 连接PHP的超时时间
+			fastcgi_send_timeout 300;  # 发送请求的超时时间
+			fastcgi_read_timeout 300;  # 读取请求的超时时间
+			location ~ \.php$ {
+				root           html;
+				fastcgi_pass   127.0.0.1:9000;
+				fastcgi_index  index.php;
+				include        fastcgi.conf;
+			}
+
+		启动服务：
+			systemctl start mariadb
+			systemctl start php-fpm
+			/usr/local/nginx/sbin/nginx
+			# 用ss命令检查80、3306、9000端口是否有开启
+
+部署Zabbix：
+	# 源码安装Zabbix
+	yum -y install net-snmp-devel curl-devel  # 安装依赖包
+	yum -y localinstall /root/soft/Zabbix/lnmp_soft/libevent-devel-2.0.21-4.el7.x86_64.rpm  # 该软件包在soft包里
+	tar -xf /root/soft/Zabbix/lnmp_soft/zabbix-3.4.4.tar.gz
+	cd zabbix-3.4.4/
+	./configure --enable-server --enable-proxy --enable-agent --with-mysql=/usr/bin/mysql_config --with-net-snmp --with-libcurl
+	# 加载这些模块需要提前安装上述的依赖包
+	make install
+	ls /usr/local/sbin/  # 默认zabbix命令在该文件夹下
+	ls /usr/local/etc/  # 默认配置文件在这！
+as
+
+初始化Zabbix：
+	> create database zabbix;  # 进到数据库里，创建对应表并授权授权用户
+	> grant all on zabbix.* to zabbix@"localhost" identified by "zabbix";
+	# 导入初始化的三张表
+	mysql -uzabbix -pzabbix zabbix < /root/zabbix-3.4.4/database/mysql/schema.sql
+	mysql -uzabbix -pzabbix zabbix < /root/zabbix-3.4.4/database/mysql/images.sql
+	mysql -uzabbix -pzabbix zabbix < /root/zabbix-3.4.4/database/mysql/data.sql
+	cp -r /root/zabbix-3.4.4/frontends/php/ /usr/local/nginx/html/zabbix
+	chmod -R 777 /usr/local/nginx/html/zabbix/
+
+配置Zabbix：
+	# 配置监控服务，在zabbix-server上操作
+	vim /usr/local/etc/zabbix_server.conf
+		38 LogFile=/tmp/zabbix_server.log  # 定义日志文件
+		80 DBHost=localhost  # 本机
+		95 DBName=zabbix  # 对应数据库的库名
+		111 DBUser=zabbix  # 数据库授权用户
+		119 DBPassword=zabbix  # 数据库授权用户的密码
+	useradd zabbix  # 添加相关用户
+	zabbix_server  # 启动服务
+	ss -antlp | grep 10051  # 查看服务启动状态，默认端口为10051
+
+	# 配置被监控服务，在zabbix-client操作，如果监控服务器也需要监控自己，则也需要操作
+	vim /usr/local/etc/zabbix_agentd.conf
+		30 LogFile=/tmp/zabbix_agentd.log  # 定义日志文件
+		93 Server=127.0.0.1,192.168.2.5  # 指定监控服务器IP地址,如果要监控本机就要加上127.0.0.1
+		134 ServerActive=192.168.2.5:10051  # 指定监控服务IP地址和端口
+		145 Hostname=Zabbix server  # 可写可不写，指定主机名，与系统的hostname无关
+		280 UnsafeUserParameters=1  # 值为0时就是默认监控选项，1就是自定义监控项
+	zabbix_agentd  # 启动zabbix客户端
+	ss -antlp | grep 10050  # 查看启动状态，默认端口为10050
+
+访问Zabbix：
+	http://192.168.2.5/zabbix/index.php
+	# 访问主页，会检查依赖项，按照提示修改配置
+	把fail按照提示修改为对应的值，以下为参考配置：
+		vim /etc/php.ini
+		384 max_execution_time = 300
+		394 max_input_time = 300
+		672 post_max_size = 16M
+		878 date.timezone = Asia/Shanghai
+	安装提示要安装的依赖包：
+		yum -y install /root/soft/Zabbix/lnmp_soft/php-bcmath-5.4.16-42.el7.x86_64.rpm  # 该包需要自己下载，soft里也有
+		yum -y install /root/soft/Zabbix/lnmp_soft/php-mbstring-5.4.16-42.el7.x86_64.rpm  # 该包需要自己下载，soft里也有
+		yum -y install php-gd php-xml php-ldap
+		systemctl restart php-fpm
+	重启服务php-fpm，刷新访问Zabbix主页，依赖检查全部为OK才算成功
+	# 在网页中继续设置
+	# 设置连接数据库的端口，0为默认，不用改，连接用的用户和密码，这里用户和密码都为zabbix
+		Database type	MySQL
+		Database server	localhost
+		Database port	default
+		Database name	zabbix
+		Database user	zabbix
+		Database password	zabbix
+		Zabbix server	192.168.2.5
+		Zabbix server port	10051
+		Zabbix server name	my zabbix
+	# 设置完成后会提示配置信息都存储在/usr/local/nginx/html/zabbix/conf/zabbix.conf.php文件中，后期可以到这里去修改
+	# 默认跳转到Zabbix登录界面，默认账户为admin，密码为zabbix
+
+单纯作zabbix_client配置：  # zabbix_agentd
+	yum -y install gcc pcre-devel
+	useradd -s /sbin/nologin zabbix
+	tar -xf /root/soft/Zabbix/lnmp_soft/zabbix-3.4.4.tar.gz
+	cd zabbix-3.4.4/
+	./configure --enable-agent
+	make install
+	vim /usr/local/etc/zabbix_agentd.conf
+		93 Server=192.168.2.5  # 填入监控服务的IP
+		134 ServerActive=192.168.2.5:10051  # 填入监控服务的IP和端口
+		145 Hostname=web100  # 定义一个标示来标示本机，无特殊效果
+		280 UnsafeUserParameters=1  # 可自定义监控模块
+	zabbix_agentd  # 启动服务
+		
+自定义监控：
+	# 有两种，一种在监控主机配置，一种是在被监控主机上配置
+	# 被监控端需要UnsafeUserParameters=1配置项，还需要定义加载配置的文件夹
+		vim /usr/local/etc/zabbix_agentd.conf
+			265 Include=/usr/local/etc/zabbix_agentd.conf.d/*.conf
+			280 UnsafeUserParameters=1
+		vim /usr/local/etc/zabbix_agentd.conf.d/get_sum_user.conf  # 定义一个获取总用户量的模块，配置文件名自定义，但需要.conf结尾
+			UserParameter=getusers,wc -l /etc/passwd | awk '{print $1}'
+			# 格式为：UserParameter=<key>,<shell command>
+		重启zabbix_agentd
+		测试自定义监控模块是否可用：
+			zabbix_get -s 127.0.0.1 -p 10050 -k getusers
+			# 前提是允许本机监控，需配置：  # 不在本机测试则不需要以下配置
+				vim /usr/local/etc/zabbix_agentd.conf
+					93 Server=127.0.0.1,192.168.2.5  # 需要填上127.0.0.1，才能本机测试
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
