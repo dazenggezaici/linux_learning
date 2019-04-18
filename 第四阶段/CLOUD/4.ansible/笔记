@@ -1,0 +1,128 @@
+实验环境：
+	六台主机：
+	cat /etc/hosts
+		192.168.1.30 ansible
+		192.168.1.31 web1
+		192.168.1.32 web2
+		192.168.1.33 db1
+		192.168.1.34 db2
+		192.168.1.35 cache
+
+ansible:
+	依赖于python&ssh
+	软件包：  # 可以将软件包定义成自定义yum源，命令(createrepo .)
+		ansible-2.4.2.0-2.el7.noarch.rpm
+		python2-jmespath-0.9.0-3.el7.noarch.rpm
+		python-httplib2-0.9.2-1.el7.noarch.rpm
+		python-paramiko-2.1.1-4.el7.noarch.rpm
+		python-passlib-1.6.5-2.el7.noarch.rpm
+		sshpass-1.06-2.el7.x86_64.rpm
+	安装：  # 只需在ansible主机上安装
+		yum -y install ansible  # 自动安装依赖，需要系统镜像，和上方自定义yum源
+
+基本使用：  # ansible 主机的集合 -m 模块名 -a 模块参数
+	配置文件优先权：
+		ANSIBLE_CONFIG变量定义的配置文件  # 最大优先权
+		./ansible.cfg  # 当前文件夹下的配置文件
+		家目录下的ansible.cfg  # ~/ansible.cfg
+		/etc/ansible/ansible.cfg  # 最小优先权
+
+	ansible --version  # 查看版本
+	vim /etc/ansible/ansible.cfg
+		14 inventory = /etc/ansible/hosts  # 开启定义主机文件
+		61 host_key_checking = False  # 密钥检测关闭，就是不用输入yes
+	vim /etc/ansible/hosts
+		[web]  # 定义web主机群
+		web[1:2]  # 表示web1,web2
+		
+		[db]
+		db1
+		db2
+		[db:vars]  # 对db集群定义统一的属性
+		ansible_ssh_port=2222
+		
+		[other]
+		cache
+		
+		[app:children]  # 定义组集群
+		web
+		db
+	ansible web --list-host
+		  hosts (2):
+			web1
+			web2
+	ansible db -m ping -k  # -m后面接模块，-k交互式输入密码
+批量发送公钥给其他主机，实现无密码登录：
+	ssh-keygen  # 交互式生成公私钥
+	ansible all -m authorized_key -a "user=root exclusive=true manage_dir=true key='$(</root/.ssh/id_rsa.pub)'" -k  # 回车后输入目标主机群密码
+		# exclusive=true 是要在对方主机追加公钥，manage_dir=true目标主机没有~/.ssh/文件夹则创建
+	ansible all -m ping  # 测试是否不需要密码操作
+
+符号：<<  # 定义终止符
+
+cat  # 当不定义终止符时，cat回车后只有用ctrl+c才能结束
+cat <<;;  # 定义cat中，终止符为;;当在cat中输入;;时就终止交互式界面
+例1：编写repo
+	cat > a.repo <<EOF
+	[local_repo]
+	name=CentOS-$releasever - Base
+	baseurl="ftp://192.168.1.254/centos7"
+	enabled=1
+	gpgcheck=1
+	EOF
+# 脚本结束时会生成a.repo文件,这里就是将EOF当作终止符
+
+ansible-doc -l  # 显示所有模块，共1300+
+ansible-doc 模块名  # 查看对应模块帮助文档
+
+shell模块，raw模块，一般不用command模块：
+	ansible cache -m shell -a 'chdir=/tmp pwd'  # chdir=/tmp修改工作目录
+	ansible web1,db2 -m shell -a 'useradd z3 && echo 123456 |passwd --stdin z3'
+	# 给主机web1,db2创建用户z3并设置密码为123456
+	ansible all -m script -a '/root/jiaoben.sh'  # 将本机的脚本给所有主机执行一遍
+	ansible all -m shell -a 'id z3 || id li4 || useradd li4'  # 对已有z3的用户不得创建li4
+
+copy模块：  # 拷贝需要验证，效率较低
+	src  本地路径
+	dest  远程路径
+	ansible all -m copy -a 'src=/etc/resolv.conf dest=/etc/resolv.conf'
+	ansible all -m shell -a 'cat /etc/resolv.conf'
+lineinfile|replace 模块，适用于局部修改配置文件
+	ansible cache -m lineinfile -a '
+	path=/etc/sysconfig/network-scripts/ifcfg-eth0
+	regexp="^GATEWAY"
+	line="GATEWAY=\"192.168.1.1\""'
+	# 将主机cache的eth0网关修改为1.1，regexp用于匹配行，line是修改后的样子
+	# 同样的功能，下面是replace模块的执行方法：
+	ansible cache -m replace -a '
+	path=/etc/sysconfig/network-scripts/ifcfg-eth0
+	regexp="\.1\.1"
+	replace=".1.254"'
+yum模块：
+	ansible db -m yum -a 'state=installed name=mariadb-server'
+	# state后面接动作，name后面接包名，多个包名可以用逗号间隔
+serivece模块：
+	ansible db -m service -a 'state=started name=mariadb enabled="yes"'
+	# 开启服务并设置开机自启
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

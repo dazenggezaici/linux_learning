@@ -1,0 +1,174 @@
+Docker：  # 是管理容器的系统
+	封装应用层，如：将DNS服务器内的系统应用封装成A，A传给B物理主机，则B也可为DNS服务器
+	容器如何区分：
+		基于操作系统之上
+		命名空间：
+			主机名
+			网络：network
+			文件系统
+			进程
+			用户
+			信号向量：signal
+	注：
+		只支持64位操作系统，系统推荐RHEL7以上，RHEL6对Docker支持非常不好
+		需要关闭防火墙
+	软件包：
+		docker-engine
+		docker-engine-selinux
+	创建自定义yum源：
+		createrepo 目录  # 操作可以将该目录成为配置yum的baseurl地址
+
+例：
+	docker1 192.168.1.21  # 需要能ping通主机名，修改hosts
+	docker2 192.168.1.22
+	yum -y install docker-engine*
+	systemctl restart docker
+	docker基础命令：
+		docker version
+		docker images  # 查看镜像,最基础镜像，base.image官方有得下载
+		docker search 镜像关键字  # 查找(搜索)镜像，前提能上网，需要有DNS
+			# OFFICIAL该选项是OK，标示官方镜像
+		docker search busybox  # 测试查找busybox
+		docker pull busybox  # 下载对应的镜像
+	docker导入导出：
+		docker save busybox:latest > busybox.tar  # 导出到文件
+		docker save 镜像名:标签(默认为latest) > 备份名  # 由于默认备份的文件类型就为tar包，所以最好把备份文件名命名为**.tar
+		docker load < busybox.tar  # 导入，还原
+	docker启动镜像：
+		docker run -it centos:latest /bin/bash
+			# docker [选项] [选项的子选项] 镜像名 镜像解释器
+	docker ps  # 查看正在运行的容器
+	docker inspect busybox  # 查看镜像详细信息，底层信息
+	docker history busybox  # 查看镜像的大致制作过程，历史
+	
+	进阶选项：
+		rmi 镜像名  # 删除镜像
+		tag 镜像名:标签 别名:别名标签  # 给镜像设置别名
+容器常用命令：  # 上面应该是docker镜像的常用命令
+	docker run|ps|stop|start|restart
+	run:  # 三过程：创建，启动，进入
+		-i  # 交互式
+		-t  # 分配终端
+		-d  # 后台运行
+	docker ps -a  # 显示所有启动过的容器
+	docker attach 容器ID  # 进入容器
+	docker exec -it 容器ID /bin/bash  # 尽量用这种方式进入容器
+	docker top 容器ID  # 查看容器进程列表
+	docker rm 容器ID  # 删除容器
+	docker rm $(docker stop $(docker ps -qa))  # 删除所有容器
+	ctrl+p+q(p和q不需要同时按，先按p再按q，ctrl不放开)，不杀死容器退出
+制作自定义镜像：
+	docker run -it centos /bin/bash
+		>对新创建的容器配置自己的yum源
+		>安装net-tools，tree等常用的命令
+		>exit  # 关闭容器并退出
+	docker commit 8976***97(容器ID) mycentos:latest  # 将刚才创建的容器另存为自定义名称：标签
+	docker images  # 查看是否创建成功
+	docker rm 8976***97(容器ID)  # 删除模板容器
+	docker history mycentos  # 查看自定义模板修改历史
+
+使用Dockerfile文件创建一个新的镜像文件：
+	Dockerfile：  # docker脚本
+	– FROM:基础镜像
+	– MAINTAINER:镜像创建者信息(说明)
+	– EXPOSE:开放的端口
+	– ENV:设置环境变量
+	– ADD:复制文件到镜像
+	– RUN:制作镜像时执行的命令,可以有多个
+	– WORKDIR:定义容器默认工作目录
+	– CMD:容器启动时执行的命令,仅可以有一条CMD
+	例1：
+		mkdir dkfcore  # 创建工作目录
+		cd dkfcore
+		touch Dockerfile  # 脚本名称区分大小写
+		vim Dockerfile
+			FROM centos:latest
+			RUN rm -f /etc/yum.repos.d/*.repo
+			ADD local.repo /etc/yum.repos.d/local.repo  # 前面是本地路径，后面是容器内路径
+			RUN yum -y install vim net-tools psmisc lftp tree iproute bash-completion
+		vim local.repo
+			[docker]
+			name=docker
+			baseurl="ftp://192.168.4.254/centos7"
+			enabled=1
+			gpgcheck=0
+		docker build -t mycentos:latest .  # 建立镜像，点(.)表示执行当前目录下的Dockerfile，-t后面接镜像名：标签
+		docker images  # 查看是否创建成功
+	例2：  # 制作httpd服务器
+		FROM mycentos:latest
+		RUN yum -y install httpd
+		EXPOSE 80
+		EXPOSE 443
+		WORKDIR /var/www/html
+		ADD index.html /var/www/html/index.html
+		ENV EnvironmentFile=/etc/sysconfig/httpd
+		CMD ["/usr/sbin/httpd", "-DFOREGROUND"]
+
+自定义镜像仓库：
+	镜像仓库服务端：
+		vim /etc/docker/daemon.json
+			{
+				"insecure-registries" : ["192.168.1.2:5000"]
+			}
+		systemctl restart docker
+		docker run -itd -p 5000:5000 registry  # 运行镜像仓库(服务端)容器
+		curl 192.168.1.2:5000/v2/  # 测试：输出{}表示成功
+		docker tag busybox:latest 192.168.1.2:5000/busybox:latest  # 给本地镜像在镜像仓库定义名称和标签
+		docker push 192.168.1.2:5000/busybox:latest  # 上传镜像
+		docker rmi 192.168.1.2:5000/busybox:latest  # 上传完可以删除
+	镜像仓库客户端：
+		vim /etc/docker/daemon.json  # 指定docker镜像服务器
+			{
+				"insecure-registries" : ["192.168.1.2:5000"]
+			}
+		systemctl restart docker
+		docker run -it 192.168.1.2:5000/busybox:latest  # 可以直接在客户端直接启动镜像仓库中的镜像
+		查看镜像仓库中有什么镜像：
+			curl http://192.168.1.2:5000/v2/_catalog
+				{"repositories":["busybox","mycentos"]}  # 可以看到有两个镜像
+			curl http://192.168.1.2:5000/v2/mycentos/tags/list  # 查看镜像中有几种不用的标签
+				{"name":"mycentos","tags":["latest"]}  # 可以看到只有一种标签latest
+
+Docker持久化存储：
+	nfs主机：  # 提供nfs存储：192.168.1.4:/var/webroot
+		mkdir /var/webroot
+		vim /etc/exports
+			/var/webroot *(rw)
+		systemctl restart nfs-server.service
+		echo 'hello,nfs' > /var/webroot/index.html
+	docker：  # 挂载nfs到本地的/var/webroot
+		mkdir /var/webroot
+		mount 192.168.1.4:/var/webroot /var/webroot
+		docker run -itd -v /var/webroot:/var/www/html mycentos:httpd
+		# 运行之前制作好的apache服务器，-v 本机路径:容器内路径，将本机某路径映射到容器内
+		# 实现nfs主机更新网页文件，容器内实时同步
+		# nginx容器案例：docker run -itd -v /var/webroot:/usr/share/nginx/html nginx，前期准备步骤一致，不再列举
+
+Docker网络：
+	创建自定义交换机：
+		docker network create --subnet=10.10.10.0/24 docker1
+	使用自定义交换机：  # 创建容器时指定使用交换机
+		docker run -itd --network=docker1 镜像名
+
+Docker容器端口映射：  # 让宿主机与容器内拥有相同的服务
+	docker run -itd -p 80:80 nginx:latest  # 让容器nginx中的nginx服务映射到宿主机的80端口上
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,84 @@
+Openstack部署：
+topo:
+	主机：  # 该实验在虚拟机上进行
+	虚拟交换机vbr:eth0网卡的虚拟交换机为NAT模式，用于与公网连接
+	虚拟交换机nw:eth1网卡的虚拟交换机为内部网络，只需要内部之间数据传输
+	实验中三台虚拟机只需要在eth0网卡配置网关：192.168.1.254
+		真机虚拟交换机vbr:192.168.1.254
+		openstack
+			eth0:192.168.1.10
+			eth1:192.168.4.10
+		nova01
+			eth0:192.168.1.11
+			eth1:192.168.4.11
+		nova02
+			eth0:192.168.1.12
+			eth1:192.168.4.12
+		主机IP为静态
+实验准备1：
+	三台虚拟机：
+		卸载firewall，关闭selinux
+		三台虚拟机都能通过eth0连接到公网，如ping通baidu.com
+		修改hosts，让三台虚拟机可以用主机名相互访问
+		/etc/resolv.conf文件中不能有search选项
+	配置yum：真机将RHEL7OSP-10.iso，CentOS7-1708.iso，RHEL7-extras.iso
+	真机(allow 0/0)与阿里云同步时间，ntp1.aliyun.com,虚拟机与真机进行同步
+	三台虚拟机都需要安装：qemu-kvm libvirt-daemon libvirt-client libvirt-daemon-driver-qemu python-setuptools
+	openstack主机: yum -y install openstack-packstack
+注：
+	ISO挂载：
+		mount -t iso9660 -o loop,ro /iso/RHEL7OSP-10.iso /var/ftp/openstack-ext/
+		mount -t iso9660 -o loop,ro /iso/CentOS7-1708.iso /var/ftp/open1708/
+		mount -t iso9660 -o loop,ro /iso/RHEL7-extras.iso /var/ftp/rhel7-ext/
+	由于RHEL7OSP-10光盘中包含多个目录，每个目录都是仓库源，生成yum文件脚本参考如下：
+		autoedityum.sh：
+			#!/bin/bash
+			for i in `cat /root/yumurl.txt`
+			do
+			name=`echo $i | awk -F- '{print $1"-"$5$6}'`
+			echo "[${name}]" >> /etc/yum.repos.d/openstack-ext.repo
+			echo "name=${name}" >> /etc/yum.repos.d/openstack-ext.repo
+			echo "baseurl=\"ftp://192.168.1.254/openstack-ext/${i}/\"" >> /etc/yum.repos.d/openstack-ext.repo
+			echo "enabled=1" >> /etc/yum.repos.d/openstack-ext.repo
+			echo "gpgcheck=0" >> /etc/yum.repos.d/openstack-ext.repo
+			done
+		yumurl.txt：  # 下面是需要配置的yum的二级目录名
+			rhel-7-server-openstack-10-devtools-rpms
+			rhel-7-server-openstack-10-optools-rpms
+			rhel-7-server-openstack-10-rpms
+			......
+
+安装 openstack
+	packstack --answer-file=answer.ini  # 生成和开始安装都为这个
+	42:    CONFIG_SWIFT_INSTALL=n
+	75:    CONFIG_NTP_SERVERS=192.168.1.254
+	98:    CONFIG_COMPUTE_HOSTS=192.168.1.11
+	102:   CONFIG_NETWORK_HOSTS=192.168.1.10,192.168.1.11
+	333:   CONFIG_KEYSTONE_ADMIN_PW=a
+	840:   CONFIG_NEUTRON_ML2_TYPE_DRIVERS=flat,vxlan
+	876:   CONFIG_NEUTRON_ML2_VXLAN_GROUP=239.1.1.5
+	910:   CONFIG_NEUTRON_OVS_BRIDGE_MAPPINGS=physnet1:br-ex
+	921:   CONFIG_NEUTRON_OVS_BRIDGE_IFACES=br-ex:eth0
+	936:   CONFIG_NEUTRON_OVS_TUNNEL_IF=eth1
+	1179:  CONFIG_PROVISION_DEMO=n
+
+安装完成以后 web 页面无法打开，修改 apache 配置文件 /etc/httpd/conf.d/15-horizon_vhost.conf
+	WSGIApplicationGroup %{GLOBAL}
+	修改配置文件以后重启 apache ，然后重新访问页面
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

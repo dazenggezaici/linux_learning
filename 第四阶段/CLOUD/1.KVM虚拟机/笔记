@@ -1,0 +1,88 @@
+KVM：
+
+virsh命令：
+	[选项]：
+		list [--all]  # 列出虚拟机，--all就是把关机的也显示
+		net-list [--all]  # 列出网络，--all是把不活跃的网络也列出
+		nodeinfo  # 查看KVM信息
+		dominfo 虚拟机名称  # 查看对应虚拟机详细信息
+		start|reboot|shutdown 虚拟机名称  # 运行重启关闭指定虚拟机
+		destroy 虚拟机名称  # 强制关闭虚拟机
+		autostart 虚拟机名称  # 将指定虚拟机设置为开机自启
+
+qcow磁盘格式：
+	前端盘--后端盘
+	只有当进行写操作时才需要将后端盘数据复制到前端盘，然后在修改前端盘数据，后端盘永远为只读
+qemu-img命令：
+	qemu-img create -f qcow2 test.img 50G  # 创建格式为qcow2的磁盘，大小为50G(指最大能到50G大小)
+	qemu-img info test.img  # 查看test.img磁盘信息
+	qemu-img create -b node.qcow2 -f qcow2 node1.qcow2 50G
+	# -b 后面接后端盘，-f 接新创建磁盘格式 新创建磁盘名称
+
+创建虚拟交换机：  # 一般在相对于虚拟机的真机上操作
+	vim /etc/libvirt/qemu/networks/vbr.xml
+		<network>
+		  <name>vbr</name>
+		  <bridge name='vbr' stp='on' delay='0'/>
+		  <domain name='vbr'/>
+		  <forward mode="nat"/>
+		  <ip address='192.168.1.254' netmask='255.255.255.0'>
+			<dhcp>
+			  <range start="192.168.1.100" end="192.168.1.200"/>
+			</dhcp>
+		  </ip>
+		</network>
+	virsh net-define /etc/libvirt/qemu/networks/vbr.xml  # 创建虚拟网络,删除就是undefine
+	virsh net-autostart vbr  # 设置网络开启启动
+	virsh net-start vbr  # 启动虚拟网络
+	virsh net-list  # 验证：查看虚拟网络交换机
+创建虚拟机：
+	vim /etc/libvirt/qemu/node1.xml  # 创建虚拟机配置文件
+	qemu-img create -b node.qcow2 -f qcow2 node1.img 50G  # 创建虚拟机磁盘
+	virsh define /etc/libvirt/qemu/node1.xml  # 添加虚拟机
+	virsh start node1  # 开启虚拟机
+	virsh console node1  # 连接虚拟机，注意不能与虚拟系统管理器共存，退出按crtl+]
+
+万能配置网卡：
+	vim /etc/sysconfig/network-scripts/ifcfg-eth0
+		ONBOOT="yes"
+		NM_CONTROLLED="no"
+		TYPE="Ethernet"
+		BOOTPROTO="static"
+		IPADDR="192.168.1.10"
+		NETMASK="255.255.255.0"
+		GATEWAY="192.168.1.254"
+	systemctl restart network
+
+磁盘扩容：
+	lsblk
+	growpart /dev/vda 1
+	xfs_growfs /
+
+修改后端盘中的数据：
+	所有前端盘都要重做
+	修改命令：
+		guestmount -a 后端盘路径 -i 需要挂载在哪个目录  # guestmount需要安装
+		# 挂载上的目录里就是后端盘中的数据
+	修改完要：umount
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
