@@ -1,0 +1,225 @@
+JSON:
+{
+  "诗人":
+    [
+      {"李白": "诗仙","年代": "唐"},
+      {"杜甫": "诗圣","年代": "唐"},
+      {"白居易": "诗魔","年代": "唐"},
+      {"李贺": "诗鬼","年代": "唐"}
+    ]
+}
+YAML:
+"诗人":
+  -
+    "李白": "诗仙"
+    "年代": "唐"
+  -
+    "杜甫": "诗圣"
+    "年代": "唐"
+  -
+    "白居易": "诗魔"
+    "年代": "唐"
+  -
+    "李贺": "诗鬼"
+    "年代": "唐"
+
+jinja2模板:
+  表示方法：
+    {{ varname }}  # 调用变量
+    {{ 2 + 3 }}  # add计算
+    {{ 1 in [1,2,3] }}  # 判断
+  控制语句：
+    {% if name == 'name1' %}
+    {% elif name == 'name2' %}
+    {% else %}
+    {% endif %}
+  循环体：
+    {% for i in [1,2,3] %}
+      {{ do i }}
+    {% endfor %}
+
+playbook:
+  书写格式:YAML
+  是ansible的脚本
+  多个ansible模块同时运行
+例1：
+vim ping.yml
+---
+- 
+  hosts: all
+  remote_user: root
+  tasks:
+    - ping: 
+    - (name)模块名: 模块参数
+  # 执行
+    ansible-playbook ping.yml
+例2：
+vim user.yml
+---
+- 
+  hosts: cache
+  remote_user: root
+  tasks:
+    - name: create user
+      user:
+        name: z3
+    - name: change password
+      shell: echo 123456 | passwd --stdin z3
+    - shell: chage -d 0 z3
+
+例3：  # 安装apache修改端口为8080，网页改为helloworld，开机自启，带注释
+---
+- 
+  hosts: web  # 只针对web组主机
+  remote_user: root
+  tasks:
+    - name: install httpd  # tasks下的一级子级下- name为注释
+      yum:
+        name: httpd  # 安装httpd
+        state: latest  # 规定官方默认版本
+    - name: change http port 8080  # 注释
+      lineinfile:  # 修改配置文件的监听端口
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "^Listen 80"
+        line: "Listen 8080"
+      lineinfile:  # 修改配置文件的ServerName
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "^ServerName"
+        line: "ServerName playbook.com"
+    - shell: /usr/sbin/apachectl -t
+    - copy:  # 复制本地/root/index.html拷贝到...
+        src: /root/index.html
+        dest: /var/www/html/index.html  # 目标主机目录
+    - service:  # 开启服务并设置开机自启
+        state: started
+        name: httpd
+        owner: root  # 所有者
+        group: root  # 所属组
+        mode: 0644  # 权限反掩码
+        enabled: yes
+例4：  # 运用了变量,变量名为username
+---
+- 
+  hosts: cache
+  remote_user: root
+  vars:  # 这里要留空，用于在命令行下传参
+  tasks:
+    - name: create user "{{ username }}"
+      user:
+        name: "{{ username }}"
+    - name: change password
+      shell: echo 123456 | passwd --stdin "{{ username }}"
+    - shell: chage -d 0 "{{ username }}"
+# 命令行下执行，传入参数"haha"
+ansible-playbook user.yml -e '{"username":"haha"}'
+例5：  # 引入过滤器，跟shell中的管道符类似
+---
+- 
+  hosts: cache
+  remote_user: root
+  vars:
+    username: xixi
+  tasks:
+    - name: create user "{{username}}"
+      user:
+        name: "{{username}}"
+        password: "{{ '123456' | password_hash('sha512') }}"
+    - name: change password time
+      shell: chage -d 0 "{{username}}"
+例6：  # 忽略函数，报错后继续运行，但会有报错信息
+---
+- 
+  hosts: web
+  remote_user: root
+  tasks:
+    - shell: useradd z3
+      ignore_errors: True  # 上条shell如果执行失败，还会继续往下执行
+    - shell: echo 123 | passwd --stdin z3
+例7：  # 触发器
+---
+- 
+  hosts: web
+  remote_user: root
+  tasks:
+    - copy:
+        src: ./httpd.conf
+        dest: /etc/httpd/conf/httpd.conf
+        owner: root
+        group: root
+        mode: 0644
+      tags: copy  # 给copy行为定义个标签，这里我们还是用copy
+      notify: reloadhttpd
+  handlers:
+    - name: reloadhttpd
+      service:
+        name: httpd
+        state: restarted
+
+ansible-playbook httpdconf.yml -t copy
+# 当执行一条指令，在httpd.conf配置文件内容改变时，才会执行重启服务(reloadhttpd)
+# 解释：由于在执行时指定标签copy，ansible只执行copy标签同级的内容
+# 这里用handlers定义触发后的执行命令，用notify函数触发
+例8：  # when,register
+---
+- 
+  hosts: web
+  remote_user: root
+  tasks:
+    - shell: uptime | awk '{printf("%.2f",$(NF-2))}'  # 输出1分钟的负载值
+      register: result  # 捕获上条命令输出的值
+    - service:
+        name: httpd
+        state: stopped
+      when: result.stdout|float > 0.7  # 当负载值超过0.7才执行service模块
+# 注意： 由于使用register这些ansible模块返回值都是用json传输，所有数据都为字符串，
+# 所以result.stdout|float 这里需要将数据强制转换为浮点型
+例9：  # 循环遍历输出
+---
+- 
+  hosts: db
+  remote_user: root
+  tasks:
+    - user:
+        name: "{{item.username}}"
+        group: "{{item.group}}"
+        password: "{{item.password|password_hash('sha512')}}"
+      with_items:
+        - 
+          username: aa
+          password: aa
+          group: users
+        - 
+          username: bb
+          password: bb
+          group: users
+        - 
+          username: cc
+          password: cc
+          group: daemon
+        - 
+          username: dd
+          password: dd
+          group: root
+例10：  # 嵌套循环
+---
+- 
+  hosts: cache
+  remote_user: root
+  vars:
+    id: [1,2,3]
+    un: ['a','b','c']
+  tasks:
+    - shell: echo "{{item}}"
+      with_nested:
+        - "{{id}}"
+        - "{{un}}"
+输出:
+	[1,'a']
+	[1,'b']
+	......
+	[2,'a']
+	...
+	[3,'c']
+
+
+
