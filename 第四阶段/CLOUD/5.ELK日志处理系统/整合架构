@@ -1,0 +1,97 @@
+192.168.1.1 es1
+192.168.1.2 es2
+192.168.1.3 es3
+192.168.1.4 es4
+192.168.1.5 es5
+192.168.1.51 logstash
+192.168.1.52 kibana
+192.168.1.53 web
+#### 软件安装情况 ####
+openjdk:  # 该软件包系统光盘有
+	es1-5,logstash
+elasticsearch:  # 该软件包在elk.tar内
+	es1-5
+kibana:  # 该软件包在elk.tar内
+	kibana
+filebeat:  # 该软件包在elk.tar内
+	web
+###################
+1、配置elasticsearch集群：
+es1-5:
+	vim /etc/elasticsearch/elasticsearch.yml
+		17 cluster.name: es@todd
+		23 node.name: es1
+		54 network.host: 0.0.0.0
+		68 discovery.zen.ping.unicast.hosts: ["es1", "es2", "es3"]
+	systemctl restart elasticsearch
+2、配置logstash并启用：
+logstash：
+vim /etc/logstash/logstash.conf
+####### logstash.conf ########
+input{
+  beats{
+	port => "5044"
+  }
+}
+filter{
+  if [type] == "apache-log"{
+	grok{
+	  match => {
+	    "message" => "%{COMBINEDAPACHELOG}"
+	  }
+	}
+  }
+}
+output{
+  stdout{
+	codec => "rubydebug"
+  }
+  if [type] == "apache-log"{
+	elasticsearch{
+	  hosts => ["es1:9200","es2:9200","es3:9200"]
+	  index => "weblog"
+	  flush_size => 2000
+	  idle_flush_time => 1
+	}
+  }
+}
+###########################
+/opt/logstash/bin/logstash -f /etc/logstash/logstash.conf
+3、配置kibana并启用：
+vim /opt/kibana/config/kibana.yml
+	15 elasticsearch.url: "http://192.168.1.1:9200"
+systemctl restart kibana
+4、测试ELK平台方法：
+	elasticsearch：
+		curl http://192.168.1.1:9200/_cluster/health?pretty
+	logstash：
+		ss -antlp | grep 5044
+	kibana：
+		ss -antlp | grep 5601
+		firefox http://192.168.1.52:5601
+5、配置web服务器，提供日志信息：
+	yum -y install httpd,filebeat
+	vim /etc/filebeat/filebeat.yml  # 注意yml结构
+		14 paths:
+		15   - /var/log/httpd/access_log
+		72 document_type: apache-log
+		278 logstash:
+		280   hosts: ["192.168.1.51:5044"]
+	systemctl restart httpd
+	systemctl restart filebeat
+	curl http://127.0.0.1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

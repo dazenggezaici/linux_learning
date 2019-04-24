@@ -22,7 +22,7 @@ topo:
 		修改hosts，让三台虚拟机可以用主机名相互访问
 		/etc/resolv.conf文件中不能有search选项
 	配置yum：真机将RHEL7OSP-10.iso，CentOS7-1708.iso，RHEL7-extras.iso
-	真机(allow 0/0)与阿里云同步时间，ntp1.aliyun.com,虚拟机与真机进行同步
+	真机(allow 0/0)与阿里云同步时间，ntp1.aliyun.com,虚拟机与真机进行同步,chronyc sources -m
 	三台虚拟机都需要安装：qemu-kvm libvirt-daemon libvirt-client libvirt-daemon-driver-qemu python-setuptools
 	openstack主机: yum -y install openstack-packstack
 注：
@@ -49,7 +49,9 @@ topo:
 			......
 
 安装 openstack
-	packstack --answer-file=answer.ini  # 生成和开始安装都为这个
+	生成:
+	packstack --gen-answer-file=answer.ini
+	packstack --answer-file=answer.ini  # 开始安装
 	42:    CONFIG_SWIFT_INSTALL=n
 	75:    CONFIG_NTP_SERVERS=192.168.1.254
 	98:    CONFIG_COMPUTE_HOSTS=192.168.1.11

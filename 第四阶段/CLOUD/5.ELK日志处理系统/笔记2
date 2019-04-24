@@ -1,0 +1,137 @@
+kibana的安装在笔记1的最后几行。
+
+导入json数据：
+curl -XPOST http://主机IP:9200/_bulk --data-binary @shakespeare.json
+# @后面接文件名,前提是json文件是有添加索引类型，如果json文件不自带索引则需用一下方法导入
+curl -XPOST http://主机IP:9200/索引/类型/_bulk --data-binary @json文件
+
+数据批量查询：
+_mget
+curl -XGET http://192.168.1.61:9200/_mget -d 'json数据'
+curl -XGET http://192.168.1.61:9200/_mget?pretty -d '
+{
+	"doc": [
+		{
+			"_index": "shakespeare",
+			"_type": "line",
+			"_id": "99"
+		},
+		{
+			"_index": "acc",
+			"_type": "ount",
+			"_id": "400"
+		},
+		{
+			"_index": "logstash-2015.05.18",
+			"_type": "log",
+			"_id": "AWpHynQdoB9_OvI_mW0-"
+		}
+	]
+}'
+动态映射：
+kibana  # 把数据用图标显示出来
+
+logstash：
+语法：  # 输入，处理，输出，三大模块
+vim /etc/logstash/logstash.conf  # 编辑配置文件
+input{
+  stdin{}  # 这里是调用了标准输入插件，类似python中的input()
+}
+
+filter{}
+
+output{
+  stdout{}  # 标准输出插件
+}
+/opt/logstash/bin/logstash -f /etc/logstash/logstash.conf  # 运行，上方语法效果如下：
+Settings: Default pipeline workers: 2
+Pipeline main started  # 前两行为启动时的正确输出
+test  # 用户输入行
+2019-04-23T06:19:02.493Z logstash test  # 系统输出行
+
+/opt/logstash/bin/logstash-plugin list  # 列出所有插件
+<-codec->标签为编码插件，可用于input,output,filter
+####### json数据输出，竖排输出json格式，默认会加时间戳
+####### 如果不是json输入则返回_jsonparsefailure字样
+input{
+  stdin{ codec => "json" }
+}
+filter{}
+output{
+  stdout{ codec => "rubydebug" }
+}
+########
+####配置输入文件插件
+input{
+  stdin{ codec => "json" }
+  file {
+    path => ["/tmp/a.log"]  # 从什么路径读取
+    sincedb_path => "/var/lib/logstash/since.db"  # 定义指针文件路径，默认在/root目录下，为隐藏文件
+    start_position => "beginning"  # 定义初始读取位置，默认从文件尾读取
+    type => "test-data"  # 打标签
+  }
+}
+#########
+#######配置监听本机8888端口
+input{
+  stdin{ codec => "json" }
+   ...
+  tcp {
+    mode => "server"  # server为监听本机，client为监听非本机的服务器
+    host => "0.0.0.0"  # 需要监听主机的IP，如果mode为client，则理解为需要访问服务器的IP
+    port => 8888  # 需要监听的端口，如果mode为client，则理解为需要访问的服务器的端口
+    type => "tcplog"
+  }
+  udp {
+    port => 8888  # 不指定mode默认监听本机
+    type => "udplog"
+  }
+}
+echo "12345daf" >/dev/tcp/logstash/8888  # 可以将字符封装发给网络中的主机，
+格式：
+>/dev/协议/主机IP/端口
+##########syslog模块，系统日志
+input{
+...
+  syslog{  # 开启后默认监听，tcp/udp 514端口
+    type => "syslog"
+  }
+}
+logstash -f /etc/logstash/logstash.conf
+测试：
+	vim /etc/rsyslog.conf  # 随便找台同网段主机，用于生成日志文件
+	75 local0.notice   @@logstash:514
+	systemctl restart rsyslog
+	logger -p local0.notice -t NSD1812 test syslog xoaisddsa  # 发送测试数据‘test syslog xoaisddsa’
+########
+######处理日志
+filter grok插件
+filter{
+  grok{
+    match =>{
+      "message" => "(?<组名称>正则)"  # 也可以用定义好的宏%{宏名称:自定义别名}，宏就是别人写好的正则，可以在/opt/logstash/vendor/bundle/jruby/1.9/gems/logstash-patterns-core-2.0.5/patterns/grok-patterns这个文件查看已定义好的宏
+    }
+  }
+}
+######比如我们要用拆分apache的日志，可以用自带的宏%{COMBINEDAPACHELOG}来实现，配置如下：
+input{
+  file {
+    sincedb_path => "/dev/null"  # 将指针文件指向黑洞，这样每次日志文件都会显示出来，方便实验和调试
+  }
+}
+...  # 改配置前后还是需要input，output的
+filter{
+  grok{
+    match => { "message" => "%{COMBINEDAPACHELOG}" }
+  }
+}
+
+#########写入数据到elasticsearch
+output{
+  elasticsearch{
+    host => ["se1:9200","se2:9200"]  # 指定elasticsearch主机的IP:port，这里用了hosts文件里的主机名而没用IP
+    index => "weblog"
+  }
+}
+
+

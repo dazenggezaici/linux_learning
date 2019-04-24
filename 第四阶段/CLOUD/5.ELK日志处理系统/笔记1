@@ -1,0 +1,112 @@
+是三款软件的合集：  # 是JAVA的技术桟，LNMP是PHP的技术桟
+	Elasticsearch：负责日志检索和储存  # 是一种数据库
+	Logstash：负责日志的收集和分析、处理  # 对数据的处理
+	Kibana：负责日志的可视化  # 负责页面展示
+
+安装Elasticsearch：
+	配置自定义yum，包名：elk.tar
+	依赖：openjdk
+	安装：yum -y install elasticsearch
+	配置文件：/etc/elasticsearch/elasticsearch.yml
+		network.host: 0.0.0.0  # 只需要开启这条选项
+	systemctl restart elasticsearch  # 启动服务
+	systemctl enabled elasticsearch  # 设置开机自启
+	ss -antlp | grep 9200  # 验证服务是否启动，默认端口为9200
+	ss -antlp | grep 9300
+	firefox 127.0.0.1:9200  # 浏览器会返回一组json数据
+	############ 以上为安装步骤和简单测试 ###########
+配置Elasticsearch集群：
+	主机hosts：
+		192.168.1.61 se1
+		192.168.1.62 se2
+		192.168.1.63 se3
+		192.168.1.64 se4
+		192.168.1.65 se5
+	主机要求：
+		都需要安装openjdk和elasticsearch
+		配置/etc/hosts
+	配置：  # 配置完需要重启Elasticsearch服务
+		vim /etc/elasticsearch/elasticsearch.yml  # 以61主机作为案例
+		17 cluster.name: nsd1812  # 定义集群名称
+		23 node.name: se1  # 定义当前主机的主机名
+		54 network.host: 0.0.0.0  # 本机发布
+		68 discovery.zen.ping.unicast.hosts: ["se1", "se2"]  # 定义声明节点(可以理解为管理者或者"主"节点)，且声明节点必须先启动服务
+	测试：
+		curl 192.168.1.62:9200/_cluster/health?pretty
+		返回状态"status" : "green"
+
+curl小进阶：
+	-A  # 修改请求agent
+	-X  # 设置请求方法
+		curl -XPOST https://www.baidu.com  # 请求方式必须大写
+	-i  # 显示返回头信息
+
+ES插件：
+	/usr/share/elasticsearch/bin/plugin  # 插件管理命令
+	/usr/share/elasticsearch/bin/plugin list  # 查看已安装插件
+	####### 通过FTP的方式安装插件，插件包也在elk.tar包内
+	/usr/share/elasticsearch/bin/plugin install ftp://192.168.1.254/elk/bigdesk-master.zip
+	/usr/share/elasticsearch/bin/plugin install ftp://192.168.1.254/elk/elasticsearch-head-master.zip
+	/usr/share/elasticsearch/bin/plugin install ftp://192.168.1.254/elk/elasticsearch-kopf-master.zip
+	############# 测试 # 上面的三个包都在61主机上安装，所以也只能访问61主机
+	http://192.168.1.61:9200/_plugin/head
+	http://192.168.1.61:9200/_plugin/kopf
+	http://192.168.1.61:9200/_plugin/bigdesk
+
+创建(PUT)索引(index)：  # 也可以在网页用图形的方式创建
+#### 这里的索引类似于mysql中的库
+curl -XPUT http://192.168.1.61:9200/tedu -d '
+{
+	"settings":{
+		"index":{
+			"number_of_shards": 5,
+			"number_of_replicas": 1
+		}
+	}
+}'
+增加数据(PUT)
+curl -XPUT http://主机IP:9200/索引/类型/id -d 'json数据'
+curl -XPUT http://192.168.1.61:9200/tedu/student/1 -d '
+{
+	"姓名": "todd",
+	"爱好": "骑车",
+	"性别": "男",
+	"年龄": "22"
+}'
+curl -XPUT http://192.168.1.61:9200/tedu/student/4?pretty -d '
+{
+	"姓名": "dazengge",
+	"爱好": "跑",
+	"性别": "男",
+	"年龄": "21"
+}'
+####### ?pretty 这是让提交数据后返回的值竖排显示，效果类似mysql中的'\G'
+修改数据(POST)
+curl -XPOST http://主机IP:9200/索引/类型/id/_update -d 'json数据'
+curl -XPOST http://192.168.1.61:9200/tedu/student/4/_update?pretty -d '
+{
+	"doc": {
+		"年龄": "19"
+	}
+}'
+####### 更新id为4的人的年龄为18 #########
+查询数据(GET)
+curl -XGET http://主机IP:9200/索引/类型/id?pretty
+###### 再次提醒，加上?pretty只是为了更好的显示 ############
+删除数据(DELETE)
+curl -XDELETE http://主机IP:9200/索引/类型/id?pretty
+curl -XDELETE http://主机IP:9200/索引  # 也可以直接删除索引
+curl -XDELETE http://主机IP:9200/*  # 也可以删除所有
+
+
+Kibana：
+	安装：
+		yum -y install kibana  # 软件包也在elk.tar包里
+	配置：
+		vim /opt/kibana/config/kibana.yml
+		15 elasticsearch.url: "http://192.168.1.61:9200"
+	启动：
+		systemctl restart kibana
+	测试：
+		http://192.168.1.60:5601
+

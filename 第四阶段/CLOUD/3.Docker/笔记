@@ -58,3 +58,18 @@ Docker：  # 是管理容器的系统
 	docker rm $(docker stop $(docker ps -qa))  # 删除所有容器
 	ctrl+p+q(p和q不需要同时按，先按p再按q，ctrl不放开)，不杀死容器退出
 
+
+进阶：
+# 可以用以下命令直接创建命名空间
+unshare
+
+
+
+
+
+
+
+
+
+
+
