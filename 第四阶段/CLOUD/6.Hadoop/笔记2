@@ -1,0 +1,140 @@
+格式xml
+    <property>
+        <name></name>
+        <value></value>
+        <description></description>
+    </property>
+
+配置nodemanager节点：  # pwd:/usr/local/hadoop
+vim etc/hadoop/mapred-site.xml.template
+<configuration>
+    <property>
+        <name>mapreduce.framework.name</name>
+        <value>yarn</value>
+    </property>
+</configuration>
+
+vim etc/hadoop/yarn-site.xml
+<configuration>
+    <property>
+        <name>yarn.resourcemanager.hostname</name>
+        <value>hadoop01</value>
+    </property>
+    <property>
+        <name>yarn.nodemanager.aux-services</name>
+        <value>mapreduce_shuffle</value>
+    </property>
+</configuration>
+配置完需要将修改后的配置文件同步到其他主机：
+for i in node{1..3}; do rsync -aSH --delete /usr/local/hadoop/ $i:/usr/local/hadoop/  -e 'ssh' & done
+运行启动脚本：
+./sbin/start-yarn.sh
+测试：
+for i in node{1..3}; do ssh $i jps; done
+./bin/yarn node -list
+用浏览器访问：
+http://192.168.1.10:50070	# namenode
+http://192.168.1.10:50090	# secondarynode
+http://192.168.1.10:8088		# resourcemanager
+http://192.168.1.11:50075	# datanode
+http://192.168.1.11:8042		# nodemanager
+
+./bin/hadoop fs -mkdir /abc  # 在hadoop分布式存储创建文件夹abc
+./bin/hadoop  dfsadmin -safemode leave  # 有时候会提示处于安全模式创建失败，需要执行这条指令关闭安全模式
+./bin/hadoop fs -put *.txt /abc  # '*.txt'表示本地当前路径下的所有.txt结尾的文件，上传到分布式存储上的/abc文件夹下
+mkdir /remote
+./bin/hadoop fs -get /abc /remote/  # 将分布式存储上的/abc文件夹下载到本的的/remote目录下
+
+./bin/hadoop jar share/hadoop/mapreduce/hadoop-mapreduce-examples-2.7.6.jar wordcount hdfs://hadoop01:9000/abc hdfs://hadoop01:9000/aaa
+# 在分布式存储下计算，计算结果也是在分布式存储上，目录hdfs://hadoop01:9000/abc，可以简写为/abc
+./bin/hadoop fs -cat /aaa/*
+
+新增节点：
+在namenode(管理)节点上配置：
+	vim /etc/hosts
+		192.168.1.10  hadoop01
+		192.168.1.11  node1
+		192.168.1.12  node2
+		192.168.1.13  node3
+		192.168.1.14  node4
+	for i in {11..14}; do scp /etc/hosts 192.168.1.${i}:/etc/hosts; done
+	ssh-copy-id 192.168.1.14
+	vim etc/hadoop/slaves
+		node1
+		node2
+		node3
+		node4
+	for i in node{1..4}; do rsync -aSH --delete /usr/local/hadoop/ $i:/usr/local/hadoop/  -e 'ssh' & done
+在datanode节点上配置：
+	yum -y install java-1.8.0-openjdk-devel
+	cd /usr/local/hadoop/
+	./sbin/hadoop-daemon.sh start datanode
+验证：
+	/usr/local/hadoop/bin/hdfs dfsadmin -report
+
+删除datanode节点：
+vim etc/hadoop/hdfs-site.xml
+......
+    <property>
+        <name>dfs.hosts.exclude</name>
+        <value>/usr/local/hadoop/etc/hadoop/exclude</value>
+    </property>
+vim etc/hadoop/exclude
+	node4
+./bin/hdfs dfsadmin -refreshNodes
+删除(nodemanager)计算节点
+./sbin/yarn-daemon stop nodemanager
+
+NFS网关：  # 给分布式存储设置NFS网关，设置完可以通过mount访问
+在管理主机10和nfsgw上配置代理用户：
+	groupadd -g 800 nsd1812
+	useradd -u 800 -g 800 -r nsd1812
+停用集群-配置-同步-启动：[hadoop01]
+./sbin/stop-all.sh
+vim etc/hadoop/core-site.xml
+......
+    <property>
+        <name>hadoop.proxyuser.nsd1812.groups</name>
+        <value>*</value>
+    </property>
+    <property>
+        <name>hadoop.proxyuser.nsd1812.hosts</name>
+        <value>*</value>
+    </property>
+for i in node{1..3}; do rsync -aSH --delete /usr/local/hadoop/ $i:/usr/local/hadoop/  -e 'ssh' & done
+./sbin/start-dfs.sh 
+./bin/hdfs dfsadmin -report
+for i in nfsgw; do rsync -aSH --delete /usr/local/hadoop/ $i:/usr/local/hadoop/  -e 'ssh' & done
+【nfsgw】
+/etc/hosts
+192.168.1.10  hadoop01
+192.168.1.11  node1
+192.168.1.12  node2
+192.168.1.13  node3
+192.168.1.14  node4
+192.168.1.15  nfsgw
+yum -y install java-1.8.0-openjdk-devel rsync
+vim etc/hadoop/hdfs-site.xml
+......
+    <property>
+        <name>nfs.exports.allowed.hosts</name>
+        <value>* rw</value>
+    </property>
+    <property>
+        <name>nfs.dump.dir</name>
+        <value>/var/nfstmp</value>
+    </property>
+启服务，在这之后命令的顺序不可改变：
+mkdir /var/nfstmp
+chown nsd1812.nsd1812 /var/nfstmp/
+rm -rf /usr/local/hadoop/logs/*
+setfacl -m u:nsd1812:rwx /usr/local/hadoop/logs
+./sbin/hadoop-daemon.sh --script ./bin/hdfs start portmap  # 必须在root用户下执行
+su -l nsd1812
+./sbin/hadoop-daemon.sh --script ./bin/hdfs start nfs3
+在客户端挂载：  # 随便找台主机
+mount -t nfs -o vers=3,proto=tcp,nolock,noacl,noatime,sync 192.168.1.15:/ /mnt/
+
+
+
+
