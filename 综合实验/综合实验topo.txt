@@ -1,0 +1,170 @@
+弹性公网IP：
+  139.159.176.26
+  139.9.61.120
+IP规划：
+# NETMASK 255.255.255.0
+堡垒机：
+	jump-server:192.168.0.199
+Git服务器：
+	git-server:192.168.0.198
+七层负载均衡：
+	VIP：192.168.0.200  # VIP绑定一个公网IP：139.9.61.120
+	Nproxy01:192.168.0.201
+	Nproxy02:192.168.0.202
+WEB集群：
+	web01:192.168.0.101
+	web02:192.168.0.102
+	web03:192.168.0.103
+	web04:192.168.0.104
+	web05:192.168.0.105
+	web06:192.168.0.106  # web05,06为静态页面组
+Redis集群：
+	Rnode01:192.168.0.111
+	Rnode02:192.168.0.112
+	Rnode03:192.168.0.113
+	Rnode04:192.168.0.114
+	Rnode05:192.168.0.115
+	Rnode06:192.168.0.116
+Ceph集群：
+	Cnode01:192.168.0.121
+	Cnode02:192.168.0.122
+	Cnode03:192.168.0.123
+	Cnode04:192.168.0.124
+	Cnode05:192.168.0.125
+	Cnode06:192.168.0.126
+ELK集群：
+	ES01:192.168.0.131
+	ES02:192.168.0.132
+	ES03:192.168.0.133
+	ES04:192.168.0.134
+	ES05:192.168.0.135
+	136-137  # 暂未定
+	Kibana01:192.168.0.39
+	Logstash01:192.168.0.38
+数据库集群：
+	HAproxy01:192.168.0.141
+	HAproxy02:192.168.0.142
+	Mycat01:192.168.0.151
+	Mycat02:192.168.0.152
+	Mycat03:192.168.0.153
+	Dnode01:192.168.0.161
+	Dnode02:192.168.0.162
+	Dnode03:192.168.0.163
+	Dnode04:192.168.0.164
+	Dnode05:192.168.0.165
+	Dnode06:192.168.0.166
+	MHA-Manager01:192.168.0.170
+
+操作：
+jump-server:
+	密码登陆
+	配置华为yum源
+	有弹性公网IP
+	yum install lrzsz
+	yum install ansible
+	systemctl stop ntpd
+	systemctl stop postfix
+	yum remove postfix ntp
+	yum -y install chrony
+	vim /etc/chrony.conf 
+	systemctl restart chronyd
+	chronyc  sources -v
+	#inventory      = /etc/ansible/hosts
+tmp-server:
+	密钥登陆
+	配置华为yum源
+	yum install lrzsz
+	systemctl stop ntpd
+	systemctl stop postfix
+	yum remove postfix ntp
+	yum -y install chrony
+	vim /etc/chrony.conf
+	systemctl restart chronyd
+	chronyc  sources -v
+	将该主机作为模板镜像
+
+Nproxy:
+	yum -y install keepalived
+	vim /etc/keepalived/keepalived.conf
+		! Configuration File for keepalived
+
+		global_defs {
+			router_id nproxy01  #nproxy02########
+		}
+		vrrp_script chk_nginx {
+			script "/etc/keepalived/nginx_check.sh"
+			interval 2
+			weight -5
+			fall 2
+			rise 1
+		}
+		vrrp_instance VI_1 {
+			state MASTER  #BACKUP##########
+			interface eth0
+			virtual_router_id 200
+			priority 100  #99##########
+			advert_int 1
+			authentication {
+				auth_type PASS
+				auth_pass 6666
+			}
+			track_script {
+				chk_nginx
+			}
+			virtual_ipaddress {
+				192.168.0.200
+			}
+		}
+	vim /etc/keepalived/nginx_check.sh
+		#!/bin/bash
+		A=`ps -C nginx --no-header |wc -l`
+		if [ $A -eq 0 ];then
+		/usr/local/nginx/sbin/nginx
+		sleep 2
+		if [ `ps -C nginx --no-header |wc -l` -eq 0 ];then
+				killall keepalived
+		fi
+		fi
+	chmod +x /etc/keepalived/nginx_check.sh
+	重启keal的playbook:
+		---
+		- hosts: nweb
+		  remote_user: root
+		  tasks:
+			- name: reload keepalived
+			  service:
+				state: restarted
+				name: keepalived
+			- shell: iptables -F
+copy跟template的区别
+template可以调用jinja2的变量
+template的用法跟copy一样，但copy不识别jinja2变量：
+- template:
+    src: test.conf
+    dest: /etc/test.conf
+    owner: bin
+    group: wheel
+    mode: "u=rw,g=r,o=r"
+vim test.conf
+	{{ ansible_hostname }}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

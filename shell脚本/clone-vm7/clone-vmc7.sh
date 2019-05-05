@@ -3,7 +3,7 @@
 virpwd='/var/lib/libvirt/images/'
 dmqcow="${virpwd}node.qcow2"
 dmxml="${virpwd}demo.xml"
-name='A'
+name='Z'
 echo "请输入一个数值用于标示"
 read -p "number:" num
 

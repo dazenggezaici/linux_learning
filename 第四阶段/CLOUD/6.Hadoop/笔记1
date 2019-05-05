@@ -34,7 +34,7 @@ hadoop：
 	cat odata/part-r-00000 | awk '{print $2}' | sort -n
 
 hadoop配置完全分布式：
-需配置四个文件：
+需配置四个文件：  # 配置文件参考https://hadoop.apache.org/docs/r2.7.6/
 hadoop-env.sh core-site.xml hdfs-site.xml slaves
 格式xml
     <property>

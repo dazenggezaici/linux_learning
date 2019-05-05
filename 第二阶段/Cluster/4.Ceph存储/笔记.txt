@@ -53,7 +53,7 @@ node1-3:
 		# 将vdb均分成两个分区
 	chown ceph.ceph /dev/vdb1;chown ceph.ceph /dev/vdb2  # node1-3
 		# 临时将vdb1-2的所有者和所属组改为ceph
-	vim /etc/udev/rules.d/70-vdb.rules  # 永久改变vdb1-2设备的所有者和所属组 node1-3
+	vim /etc/udev/rules.d/70-vdb.rules  # 永久改变vdb1-2设备的所有者和所属组 # node1-3
 		ENV{DEVNAME}=="/dev/vdb1",OWNER="ceph",GROUP="ceph"
 		ENV{DEVNAME}=="/dev/vdb2",OWNER="ceph",GROUP="ceph"
 	ceph-deploy disk zap node1:vdc node1:vdd  #

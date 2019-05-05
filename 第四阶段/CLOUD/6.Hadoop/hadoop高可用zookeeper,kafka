@@ -1,0 +1,99 @@
+zookeeper：
+--用于协调集群工作
+安装：
+	tar -xf zookeeper-3.4.10.tar.gz  # 该软件包在Hadoop.zip下
+	mv zookeeper-3.4.10 /usr/local/zookeeper
+配置：  # 配置在hadoop01主机上进行
+	mv conf/zoo_sample.cfg conf/zoo.cfg
+	chown root.root conf/zoo.cfg
+	vim conf/zoo.cfg
+	# 在文件最后添加以下几行
+		server.1=node1:2888:3888
+		server.2=node2:2888:3888
+		server.3=node3:2888:3888
+		server.4=hadoop01:2888:3888:observer  # 本机只做observer角色
+	# 将配置文件和包发给其余主机
+	for i in node{1..3}; do rsync -aSH --delete /usr/local/zookeeper/ ${i}:/usr/local/zookeeper  -e 'ssh' & done
+	# 在所有主机上创建/tmp/zookeeper目录
+	mkdir /tmp/zookeeper  # 本机
+	for i in node{1..3}; do ssh $i 'mkdir /tmp/zookeeper && echo -e "\033[32m[ok]\033[0m"' & done  # 远程机创建
+	# 在所有主机创建/tmp/zookeeper/myid文件并写入serverID
+	echo 4 > /tmp/zookeeper/myid
+	for i in {1..3}; do ssh node${i} "echo $i > /tmp/zookeeper/myid"; done
+测试：  # socat
+	yum -y install socat  # 该包可以发送网络命令
+	echo "ruok" | socat - TCP:node3:2181
+	echo "conf" | socat - TCP:node3:2181
+	echo "stat" | socat - TCP:node3:2181
+
+Kafka集群:
+消息队列
+安装配置开启：
+	tar -xf kafka_2.10-0.10.2.1.tgz  # 该软件包在Hadoop.zip下
+	mv kafka_2.10-0.10.2.1/ /usr/local/kafka/
+	cd /usr/local/kafka/
+	vim config/server.properties
+		21 broker.id=4  # 每台服务器ID不同即可
+		119 zookeeper.connect=node1:2181,node2:2181,node3:2181  # 每台服务器都要一致
+	for i in node{1..3}; do  rsync -aSH --delete /usr/local/kafka $i:/usr/local/; done
+	/usr/local/kafka/bin/kafka-server-start.sh -daemon /usr/local/kafka/config/server.properties  # 每台服务器都要执行这条指令
+	ss -antlp | grep 9092
+
+hadoop高可用：
+方案一：
+	利用NFS+keeplived，inotify+rsync同步两台NFS数据
+方案二：  # QJM
+两台namenode，datanode要分别给两台namenode发送块位置；
+主namenode将修改信息写入到JNS，备namenode读取JNS内的修改信息进行修改块内容；
+部署：
+	备用namenode
+	一台JNS服务器
+	将datanode分别指向主备namenode
+1、配置一台环境与hadoop01相当的主机
+	IP、YUM、HOSTS、OPENJDK-devel、hadoop
+	SSH公私钥，免密登录所有主机，免除KEY认证
+	详情查看笔记1
+	注意：hosts文件需要同步到所有主机
+	192.168.1.10  hadoop01
+	192.168.1.20  hadoop02
+	192.168.1.11  node1
+	192.168.1.12  node2
+	192.168.1.13  node3
+	192.168.1.14  node4
+	192.168.1.15  nfsgw
+2、修改配置文件
+xml格式：
+    <property>
+        <name></name>
+        <value></value>
+    </property>
+3、
+./bin/hdfs zkfc -formatZK
+4、测试
+/usr/local/hadoop/bin/hdfs haadmin -getServiceState nn1
+	active
+/usr/local/hadoop/bin/hdfs haadmin -getServiceState nn2
+	standby
+/usr/local/hadoop/bin/yarn rmadmin -getServiceState rm1
+	active
+/usr/local/hadoop/bin/yarn rmadmin -getServiceState rm2
+	standby
+
+/usr/local/hadoop/bin/hdfs dfsadmin -report
+/usr/local/hadoop/bin/yarn  node  -list
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
