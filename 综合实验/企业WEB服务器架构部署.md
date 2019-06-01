@@ -1,5 +1,7 @@
 # 企业WEB服务器架构部署
 
+<!--author: Todd-->
+
 ## 一. TOPO规划在同级目录中的pdf
 
 
@@ -405,7 +407,7 @@ AQDI1c9c9zyyLxAAS75B4rh3hJjQXgKXPE0qYA==
 
 ### (六) 数据库集群
 
-说明:在部署数据库集群Dnode0[1:6]时,使用ansible批量部署.
+说明:在部署数据库集群Dnode0[1:6]时,使用ansible批量部署.,所有Dnode节点需要相互免密
 
 #### 在堡垒机上:
 
@@ -421,18 +423,18 @@ vim myhosts
 mt
 sl
 [mt]
-192.168.1.16[1:3]
+192.168.0.16[1:3]
 [sl]
-192.168.1.16[4:6]
+192.168.0.16[4:6]
 [mag]
-192.168.1.170
+192.168.0.170
 ###配置文件###
 ansible all -m authorized_key -a "user=root exclusive=true manage_dir=true key='$(< /root/.ssh/id_rsa.pub)'" -k  # 需要免密才需要敲这一条
-for i in {161..166}; do (scp /root/mysql-5.7.17.tar 192.168.1.$i:/root/) & done  # 将mysql包发给所有主机
+for i in {161..166}; do (scp /root/mysql-5.7.17.tar 192.168.0.$i:/root/) & done  # 将mysql包发给所有主机
 # 由于是本地包安装,我们直接用ssh控制node节点安装
-for i in 192.168.1.{161..166}; do ssh $i 'tar -xf /root/mysql-5.7.17.tar && echo -e "\033[32m[ok]\033[0m"' & done  # 解压
-for i in 192.168.1.{161..166}; do ssh $i 'yum -y localinstall /root/* && echo -e "\033[32m[ok]\033[0m"' & done  # 安装
-for i in 192.168.1.{161..166}; do ssh $i 'systemctl restart mysqld && echo -e "\033[32m[ok]\033[0m"' & done  # 启动
+for i in 192.168.0.{161..166}; do ssh $i 'tar -xf /root/mysql-5.7.17.tar && echo -e "\033[32m[ok]\033[0m"' & done  # 解压
+for i in 192.168.0.{161..166}; do ssh $i 'yum -y localinstall /root/* && echo -e "\033[32m[ok]\033[0m"' & done  # 安装
+for i in 192.168.0.{161..166}; do ssh $i 'systemctl restart mysqld && echo -e "\033[32m[ok]\033[0m"' & done  # 启动
 grep root@localhost /var/log/mysqld.log | awk '{print $NF}'  # 该命令可以筛选出初始密码
 mysql -uroot -p$(grep root@localhost /var/log/mysqld.log | awk '{print $NF}') --connect-expired-password -e "alter user 'root'@'localhost' identified by 'Abc123***';"  # 结合上一条shell命令就可以自动修改Mysql初始密码了,由于这条指令中有单双引号,因此在用ssh远程发送命令时会报错,这里暂时只能把这条命令复制到node节点上执行.
 ```
@@ -453,7 +455,7 @@ def ssh_com(ip, port, key, command):
     ssh.close()
 if __name__ == '__main__':
     private_key = paramiko.RSAKey.from_private_key_file('/root/.ssh/id_rsa')
-    ip_net = '192.168.1.'
+    ip_net = '192.168.0.'
     port = 22
     cmd = '''mysql -uroot -p$(grep root@localhost /var/log/mysqld.log | awk '{print $NF}') --connect-expired-password -e "alter user 'root'@'localhost' identified by 'Abc123***';"'''
     for ip in range(161, 167):
@@ -469,7 +471,7 @@ python3 ssh.py
 ```shell
 pwd  # 在堡垒机的ansible工作目录
 /root/work  # 在ansible工作目录
-scp 192.168.1.161:/etc/my.cnf .  # 将主数据库配置文件复制到当前目录下
+scp 192.168.0.161:/etc/my.cnf .  # 将主数据库配置文件复制到当前目录下
 
 vim my.cnf
 [mysqld]
@@ -491,9 +493,9 @@ vim e-mysql.yml
         dest: /etc/my.cnf
 
 ansible-playbook e-mysql.yml  # 运行playbook
-for i in {1..3}; do ssh 192.168.1.16$i "sed -i "s/Dnode0$i/$i/" /etc/my.cnf"; done
+for i in {1..3}; do ssh 192.168.0.16$i "sed -i "s/Dnode0$i/$i/" /etc/my.cnf"; done
 # 将mysql配置文件中的Dnode0x修改为x
-for i in {1..3}; do ssh 192.168.1.16$i "systemctl restart mysqld"; done  # 重启数据库
+for i in {1..3}; do ssh 192.168.0.16$i "systemctl restart mysqld"; done  # 重启数据库
 ```
 
 #### 配置纯从库服务器(Dnode0[4:6]),与配置主库步骤类似,但配置不同
@@ -501,7 +503,7 @@ for i in {1..3}; do ssh 192.168.1.16$i "systemctl restart mysqld"; done  # 重�
 ```shell
 pwd  # 在堡垒机的ansible工作目录
 /root/work  # 在ansible工作目录
-scp 192.168.1.164:/etc/my.cnf .  # 将从数据库配置文件复制到当前目录下
+scp 192.168.0.164:/etc/my.cnf .  # 将从数据库配置文件复制到当前目录下
 
 vim my.cnf
 [mysqld]
@@ -520,9 +522,9 @@ vim e-mysql.yml
         dest: /etc/my.cnf
 
 ansible-playbook e-mysql.yml  # 运行playbook
-for i in {4..6}; do ssh 192.168.1.16$i "sed -i "s/Dnode0$i/$i/" /etc/my.cnf"; done
+for i in {4..6}; do ssh 192.168.0.16$i "sed -i "s/Dnode0$i/$i/" /etc/my.cnf"; done
 # 将mysql配置文件中的Dnode0x修改为x
-for i in {4..6}; do ssh 192.168.1.16$i "systemctl restart mysqld"; done  # 重启数据库
+for i in {4..6}; do ssh 192.168.0.16$i "systemctl restart mysqld"; done  # 重启数据库
 ```
 
 #### 配置主从同步:
@@ -549,9 +551,9 @@ def ssh_com(ip, port, key, command):
     ssh.close()
 if __name__ == '__main__':
     private_key = paramiko.RSAKey.from_private_key_file('/root/.ssh/id_rsa')
-    ip_net = '192.168.1.'
+    ip_net = '192.168.0.'
     port = 22
-    cmd = '''mysql -uroot -pAbc123*** -e "change master to master_host='192.168.1.161',master_user='slave',master_password='Abc123***',master_log_file='master161.000002',master_log_pos=438;"'''
+    cmd = '''mysql -uroot -pAbc123*** -e "change master to master_host='192.168.0.161',master_user='slave',master_password='Abc123***',master_log_file='master161.000002',master_log_pos=438;"'''
     for ip in range(162, 167):
         ip = ip_net + str(ip)
         ssh_com(ip, port, private_key, cmd)
@@ -569,7 +571,7 @@ cmd = '''mysql -uroot -pAbc123*** -e "start slave;"'''
 在堡垒机上验证是否同步成功
 
 ```shell
-for i in 192.168.1.{162..166}; do ssh $i 'mysql -uroot -pAbc123*** -e "show slave status\G;" | awk "/Slave_.*_Running/"'; done
+for i in 192.168.0.{162..166}; do ssh $i 'mysql -uroot -pAbc123*** -e "show slave status\G;" | awk "/Slave_.*_Running/"'; done
 # 这里有5台从服务器,所以会输出5对yes才正确
 # 输出参考结果:
 Slave_IO_Running: Yes
@@ -587,6 +589,111 @@ Slave_SQL_Running_State: Slave has read all relay log; waiting for more updates
 Slave_IO_Running: Yes
 Slave_SQL_Running: Yes
 Slave_SQL_Running_State: Slave has read all relay log; waiting for more updates
+```
+
+#### 配置MHA管理主机(MHA-Manager01):
+
+```shell
+yum -y install perl*  # 由于MHA是perl语言写的,需要安装perl语言环境
+cd mha-package/
+tree
+.
+├── app1.cnf
+├── master_ip_failover
+├── mha4mysql-manager-0.56.tar.gz
+├── mha4mysql-node-0.56-0.el6.noarch.rpm
+├── perl-Config-Tiny-2.14-7.el7.noarch.rpm
+├── perl-Email-Date-Format-1.002-15.el7.noarch.rpm
+├── perl-Log-Dispatch-2.41-1.el7.1.noarch.rpm
+├── perl-Mail-Sender-0.8.23-1.el7.noarch.rpm
+├── perl-Mail-Sendmail-0.79-21.el7.art.noarch.rpm
+├── perl-MIME-Lite-3.030-1.el7.noarch.rpm
+├── perl-MIME-Types-1.38-2.el7.noarch.rpm
+└── perl-Parallel-ForkManager-1.18-2.el7.noarch.rpm
+
+0 directories, 12 files
+yum -y install ./perl-*.rpm
+yum -y install ./mha4mysql-node-0.56-0.el6.noarch.rpm
+for i in 192.168.1.{161..166}; do scp ./mha4mysql-node-0.56-0.el6.noarch.rpm $i:/root; done
+for i in 192.168.1.{161..166}; do ssh $i 'yum -y install /root/mha4mysql-node-0.56-0.el6.noarch.rpm'; done
+tar -xf mha4mysql-manager-0.56.tar.gz
+cd mha4mysql-manager-0.56/
+perl Makefile.PL
+make && make install
+mkdir /etc/mha_manager_dir
+cp ./samples/conf/app1.cnf /etc/mha_manager_dir/
+vim /etc/mha_manager_dir/app1.cnf
+[server default]
+manager_workdir=/etc/mha_manager_dir
+manager_log=/etc/mha_manager_dir/manager.log
+
+master_ip_failover_script=/etc/mha_manager_dir/master_ip_failover  # 指定主库故障切换脚本
+ssh_user=root  # 指定远程登录的用户和密码
+ssh_port=22
+repl_user=slave  # 指定主服务器授权给从服务器同步用的账户和密码
+repl_password=Abc123***
+user=todd  # 用于监控的用户，需要有所有权限且管理主机可以登录，可以是root，但root用户默认只能本地登录
+password=Abc123***
+
+[server1]
+hostname=Dnode01
+candidate_master=1  # 参与主库竞选
+
+[server2]
+hostname=Dnode02
+candidate_master=1
+
+[server3]
+hostname=Dnode03
+candidate_master=1
+
+[server4]
+hostname=Dnode04
+no_master=1  # 不参与主库竞选
+[server5]
+hostname=Dnode05
+no_master=1
+[server6]
+hostname=Dnode06
+no_master=1
+pwd
+/root/mha-package
+cp master_ip_failover /etc/mha_manager_dir/
+chmod +x /etc/mha_manager_dir/master_ip_failover
+# master_ip_failover该文件需要修改下VIP变量和给该文件赋于X权限,这里我们定VIP为192.168.0.169
+```
+
+#### 给当前主库配置VIP和授权监控用户:
+
+```shell
+ifconfig eth0:1 192.168.0.169
+mysql -uroot -pAbc123*** -e 'grant all on *.* to "todd"@"%" identified by "Abc123***";'
+# 配置监控用户在主库上
+```
+
+测试mha集群,在mha管理节点MHA-Manager01上执行:
+
+```shell
+masterha_check_ssh --conf=/etc/mha_manager_dir/app1.cnf  # 测试ssh连接
+	All SSH connection tests passed successfully.  # 成功提示
+masterha_check_repl --conf=/etc/mha_manager_dir/app1.cnf  # 测试主从同步
+	MySQL Replication Health is OK.  # 成功提示
+# 上面步骤一般都会报错,只需要看报错信息排错即可.
+masterha_manager --conf=/etc/mha_manager_dir/app1.cnf  # 启动服务后会占用一个终端,需要开多一个终端验证
+masterha_check_status --conf=/etc/mha_manager_dir/app1.cnf  # 查看服务状态
+	app1 (pid:20524) is running(0:PING_OK), master:Dnode01
+```
+
+#### 测试高可用:
+
+```shell
+# 先把主库Dnode01的mysql服务停用:
+systemctl stop mysqld
+# 然后mha进程会结束
+# 将mha指令按下方格式再启动
+masterha_manager --conf=/etc/mha_manager_dir/app1.cnf --remove_dead_master_conf --ignore_last_failover
+masterha_check_status --conf=/etc/mha_manager_dir/app1.cnf  # 查看服务状态
+	app1 (pid:20524) is running(0:PING_OK), master:Dnode02
 ```
 
 
