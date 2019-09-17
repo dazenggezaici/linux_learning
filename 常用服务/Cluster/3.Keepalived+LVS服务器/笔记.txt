@@ -65,7 +65,7 @@ Keepalived高可用服务器:
 			eth0:192.168.4.100
 			VIP:192.168.4.15(该IP需要在lo:0上配置，具体配置过程请参考Cluster.Day2.配置RS1&RS2的lo:0网卡)
 		web2(RS2):
-			eth0:192.168.4.100
+			eth0:192.168.4.200
 			VIP:192.168.4.15(该IP需要在lo:0上配置，具体配置过程请参考Cluster.Day2.配置RS1&RS2的lo:0网卡)
 	Keepalived配置：
 		proxy:
